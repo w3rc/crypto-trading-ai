@@ -40,3 +40,34 @@ def test_stop_triggered():
     assert stop_triggered(pos, 94) is True
     assert stop_triggered(pos, 96) is False
     assert stop_triggered(Position("BTC/USDT"), 1) is False  # flat
+
+
+def test_buy_then_sell_roundtrip_profit_minus_costs():
+    from engine.broker import apply_fill
+    pos = Position("BTC/USDT")
+    from engine.models import Order
+    pos2, cash2, fill_b = apply_fill(Order("buy", 1.0, 100.0), pos, 1000.0,
+                                     fee_pct=0.001, slippage_pct=0.0005,
+                                     stop_loss_pct=0.05, ts="t1")
+    assert cash2 < 1000.0
+    assert pos2.qty == pytest.approx(1.0)
+    assert pos2.stop_price == pytest.approx(pos2.avg_price * 0.95)
+    pos3, cash3, fill_s = apply_fill(Order("sell", 1.0, 110.0), pos2, cash2,
+                                     fee_pct=0.001, slippage_pct=0.0005,
+                                     stop_loss_pct=0.05, ts="t2")
+    assert pos3.qty == 0.0 and pos3.avg_price == 0.0   # flat after full exit
+    assert 1000.0 < cash3 < 1010.0                     # profit on +10 move, minus costs
+
+def test_buy_exceeding_cash_asserts():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    with pytest.raises(AssertionError):
+        apply_fill(Order("buy", 100.0, 100.0), Position("BTC/USDT"), 50.0,
+                   0.001, 0.0005, 0.05, "t")
+
+def test_sell_exceeding_holdings_asserts():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    with pytest.raises(AssertionError):
+        apply_fill(Order("sell", 5.0, 100.0), Position("BTC/USDT", qty=1.0),
+                   0.0, 0.001, 0.0005, 0.05, "t")
