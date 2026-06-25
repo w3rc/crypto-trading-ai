@@ -47,8 +47,16 @@ def test_oversold_is_buy_with_buy_size():
 
 
 def test_overbought_is_sell_full():
+    # emits sell holdings-agnostically; a sell-while-flat is gate-nullified downstream
     d = strategies.indicator_rule(_feats(rsi=80), _FLAT, 1000.0, _ns())
     assert d.action == "sell" and d.size == 1.0
+
+
+def test_macd_crossover_only_is_buy():
+    # RSI neutral, but macd>signal AND ma_fast>ma_slow -> bullish via the OR's second leg
+    d = strategies.indicator_rule(
+        _feats(rsi=50, macd=1, sig=0, fast=101, slow=100), _FLAT, 1000.0, _ns())
+    assert d.action == "buy"
 
 
 def test_neutral_is_hold():
