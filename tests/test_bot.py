@@ -27,13 +27,12 @@ class FakeMarket:
         return _df()
     def fetch_price(self, ex, sym): return self.price
 
-class FakeLLM:
-    def __init__(self, decision): self.decision = decision
-    def decide(self, features, position, cash, cfg, client=None): return self.decision
+def _strat(decision):
+    return lambda features, position, cash, cfg: decision
 
 def test_buy_decision_updates_state_and_logs_trade(tmp_path):
     cfg = _cfg(tmp_path)
-    bot.run_once(cfg, market=FakeMarket(), llm=FakeLLM(Decision(action="buy", size=1.0)))
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="buy", size=1.0)))
     st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st.cash < 10000.0
     assert st.positions["BTC/USDT"].qty > 0
@@ -43,7 +42,7 @@ def test_buy_decision_updates_state_and_logs_trade(tmp_path):
 
 def test_hold_decision_makes_no_trade(tmp_path):
     cfg = _cfg(tmp_path)
-    bot.run_once(cfg, market=FakeMarket(), llm=FakeLLM(Decision(action="hold")))
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
     st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st.cash == 10000.0
     assert not (tmp_path / "trades.csv").exists()
@@ -51,7 +50,7 @@ def test_hold_decision_makes_no_trade(tmp_path):
 def test_fetch_error_skips_symbol_keeps_going(tmp_path):
     cfg = _cfg(tmp_path, symbols=("BTC/USDT", "ETH/USDT"))
     market = FakeMarket(raise_for=("BTC/USDT",))
-    bot.run_once(cfg, market=market, llm=FakeLLM(Decision(action="buy", size=1.0)))
+    bot.run_once(cfg, market=market, strategy=_strat(Decision(action="buy", size=1.0)))
     st = load_state(str(tmp_path), 10000.0, ["BTC/USDT", "ETH/USDT"])
     assert st.positions["BTC/USDT"].qty == 0      # skipped
     assert st.positions["ETH/USDT"].qty > 0       # processed
@@ -64,8 +63,8 @@ def test_stop_loss_forces_exit(tmp_path):
     st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=210.0, stop_price=200.0)
     from engine.state import save_state_atomic
     save_state_atomic(st, str(tmp_path))
-    # LLM says hold, but the stop must override and exit
-    bot.run_once(cfg, market=FakeMarket(price=159.0), llm=FakeLLM(Decision(action="hold")))
+    # Strategy says hold, but the stop must override and exit
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.positions["BTC/USDT"].qty == 0.0
     assert st2.cash > 0.0
@@ -78,14 +77,14 @@ def test_nonpositive_price_skips_symbol_no_liquidation(tmp_path):
     from engine.state import save_state_atomic
     save_state_atomic(st, str(tmp_path))
     # a zero ticker must NOT liquidate the stopped-out position
-    bot.run_once(cfg, market=FakeMarket(price=0.0), llm=FakeLLM(Decision(action="hold")))
+    bot.run_once(cfg, market=FakeMarket(price=0.0), strategy=_strat(Decision(action="hold")))
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.positions["BTC/USDT"].qty == 1.0
     assert st2.cash == 0.0
 
 def test_decisions_are_logged_each_cycle(tmp_path):
     cfg = _cfg(tmp_path)
-    bot.run_once(cfg, market=FakeMarket(), llm=FakeLLM(Decision(action="buy", size=1.0)))
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="buy", size=1.0)))
     lines = (tmp_path / "decisions.jsonl").read_text().strip().splitlines()
     assert len(lines) == 1                      # one priced symbol -> one decision record
     rec = _json.loads(lines[0])
@@ -95,6 +94,6 @@ def test_decisions_are_logged_each_cycle(tmp_path):
 
 def test_hold_decision_is_logged_not_executed(tmp_path):
     cfg = _cfg(tmp_path)
-    bot.run_once(cfg, market=FakeMarket(), llm=FakeLLM(Decision(action="hold", reason="flat")))
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold", reason="flat")))
     rec = _json.loads((tmp_path / "decisions.jsonl").read_text().strip())
     assert rec["action"] == "hold" and rec["executed"] is False and rec["reason"] == "flat"
