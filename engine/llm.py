@@ -41,7 +41,13 @@ def decide(features: dict, position: Position, cash: float, cfg, client=None) ->
     try:
         if client is None:
             from openai import OpenAI
-            client = OpenAI(base_url=cfg.base_url, api_key=cfg.api_key)
+            # Some OpenAI-compatible gateways sit behind a WAF / AI-bot rule that
+            # 403s the SDK's default "OpenAI/Python" User-Agent; a neutral UA passes.
+            client = OpenAI(
+                base_url=cfg.base_url,
+                api_key=cfg.api_key,
+                default_headers={"User-Agent": "cryptotrading-bot/1.0"},
+            )
         kwargs = dict(
             model=cfg.model,
             messages=[
