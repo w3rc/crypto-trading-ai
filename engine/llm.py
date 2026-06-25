@@ -30,25 +30,28 @@ def _extract_json(text: str) -> dict:
     except json.JSONDecodeError:
         start, end = text.find("{"), text.rfind("}")
         if start != -1 and end > start:
-            return json.loads(text[start:end + 1])
+            try:
+                return json.loads(text[start:end + 1])
+            except json.JSONDecodeError as exc:
+                raise ValueError("no JSON object found") from exc
         raise ValueError("no JSON object found")
 
 
 def decide(features: dict, position: Position, cash: float, cfg, client=None) -> Decision:
-    if client is None:
-        from openai import OpenAI
-        client = OpenAI(base_url=cfg.base_url, api_key=cfg.api_key)
-    kwargs = dict(
-        model=cfg.model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": _build_user(features, position, cash)},
-        ],
-        temperature=0,
-    )
-    if cfg.json_mode:
-        kwargs["response_format"] = {"type": "json_object"}
     try:
+        if client is None:
+            from openai import OpenAI
+            client = OpenAI(base_url=cfg.base_url, api_key=cfg.api_key)
+        kwargs = dict(
+            model=cfg.model,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": _build_user(features, position, cash)},
+            ],
+            temperature=0,
+        )
+        if cfg.json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
         resp = client.chat.completions.create(**kwargs)
         data = _extract_json(resp.choices[0].message.content)
         return Decision(**data)

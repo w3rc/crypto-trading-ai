@@ -13,8 +13,10 @@ class _Resp:
 class FakeClient:
     def __init__(self, content=None, exc=None):
         self.content, self.exc = content, exc
+        self.last_kwargs = None
         self.chat = type("C", (), {"completions": self})()
     def create(self, **kwargs):
+        self.last_kwargs = kwargs
         if self.exc: raise self.exc
         return _Resp(self.content)
 
@@ -40,3 +42,18 @@ def test_exception_is_hold():
     c = FakeClient(exc=RuntimeError("network down"))
     d = decide(FEATS, Position("BTC/USDT"), 10000, CFG, client=c)
     assert d.action == "hold" and "network down" in d.reason
+
+def test_json_mode_true_sets_response_format():
+    c = FakeClient(content='{"action":"hold"}')
+    decide(FEATS, Position("BTC/USDT"), 10000, CFG, client=c)
+    assert c.last_kwargs.get("response_format") == {"type": "json_object"}
+
+def test_json_mode_false_omits_response_format():
+    cfg2 = LLMConfig(base_url="x", api_key="x", model="m", json_mode=False)
+    c = FakeClient(content='{"action":"hold"}')
+    decide(FEATS, Position("BTC/USDT"), 10000, cfg2, client=c)
+    assert "response_format" not in c.last_kwargs
+
+def test_brace_wrapped_invalid_json_is_hold():
+    c = FakeClient(content="My call: { price: 100, action: buy }")  # invalid JSON inside braces
+    assert decide(FEATS, Position("BTC/USDT"), 10000, CFG, client=c).action == "hold"
