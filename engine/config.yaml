@@ -1,0 +1,15 @@
+exchange: binance
+symbols: [BTC/USDT, ETH/USDT]
+timeframe: 15m
+paper_capital: 10000.0
+fee_pct: 0.001
+slippage_pct: 0.0005
+data_dir: data
+risk:
+  max_position_pct: 0.25
+  stop_loss_pct: 0.05
+llm:
+  base_url: https://ai.myhermes.cloud/v1
+  api_key_env: MYHERMES_API_KEY
+  model: z-ai/glm-5.2
+  json_mode: true

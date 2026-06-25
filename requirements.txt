@@ -1,0 +1,6 @@
+ccxt
+pandas
+openai
+pydantic
+pyyaml
+pytest
