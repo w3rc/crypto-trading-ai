@@ -1,7 +1,10 @@
-// Placeholder renderer entry — replaced in Task 5 with the real App.
-import { createElement } from "react";
+import "./index.css";
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import App from "./App";
 
 createRoot(document.getElementById("root")!).render(
-  createElement("div", { style: { color: "#e8edf7", padding: 24 } }, "Dashboard scaffold OK"),
+  <StrictMode>
+    <App />
+  </StrictMode>,
 );
