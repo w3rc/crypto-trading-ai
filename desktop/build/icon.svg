@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1b2440"/>
+      <stop offset="1" stop-color="#0a0e1a"/>
+    </linearGradient>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7c8bff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#7c8bff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.30" r="0.55">
+      <stop offset="0" stop-color="#3a4a8f" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#3a4a8f" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="224" fill="url(#glow)"/>
+  <rect x="12" y="12" width="1000" height="1000" rx="212" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="6"/>
+  <path d="M190 700 L330 632 L450 668 L580 500 L700 556 L834 320 L834 834 L190 834 Z" fill="url(#area)"/>
+  <path d="M190 700 L330 632 L450 668 L580 500 L700 556 L834 320" fill="none"
+        stroke="#7c8bff" stroke-width="30" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="834" cy="320" r="34" fill="#34d399"/>
+  <circle cx="834" cy="320" r="34" fill="none" stroke="#0a0e1a" stroke-width="8"/>
+</svg>
