@@ -41,7 +41,7 @@ can be forward-tested and watched before any real capital is risked.
 | Risk posture | Paper trading (simulated money) |
 | Brain | Hybrid — code computes indicators, LLM makes the final call with written reasoning |
 | Cadence | Config-driven; bot runs once per invocation, triggered by cron/systemd-timer at any interval. Default cron `*/15 * * * *` |
-| Interface | Web dashboard — custom **Next.js** app (App Router), dark/gradient/glass aesthetic (motionsites-inspired), read-only + console/log output |
+| Interface | Desktop dashboard — custom **Electron** app (Vite + React), dark/gradient/glass aesthetic (motionsites-inspired), read-only + console/log output. (Was Next.js; changed to Electron 2026-06-25.) |
 | Data + execution layer | CCXT (market data now; same library enables live `create_order` later) |
 | Default exchange/data | Binance via CCXT (deepest liquidity; one-line swap to Crypto.com/Kraken/etc.) |
 | Default symbols | `BTC/USDT`, `ETH/USDT` (configurable list) |
@@ -65,10 +65,10 @@ data/
   state.json      # cash, open positions, equity history (atomic writes)
   trades.csv      # append-only trade log
 
-# Next.js dashboard (read-only viewer) — separate Node runtime
-dashboard/        # App Router app, dark/gradient/glass UI
-                  #   server reads ../data/state.json + trades.csv
-                  #   equity curve + open positions + decision log, client-polled refresh
+# Electron dashboard (read-only viewer) — separate desktop app (Node main + React renderer)
+desktop/          # Electron + Vite + React, dark/gradient/glass UI
+                  #   main process reads ../data/{state.json,trades.csv,decisions.jsonl}
+                  #   renderer polls main via IPC; equity curve + positions + decision log
 ```
 
 Runtime artifacts (gitignored): `data/state.json`, `data/trades.csv`, `.env`
@@ -103,11 +103,13 @@ between them, no shared database, no shared process.
   **validates the response with Pydantic** into `{action, size, reason, stop?}`.
   Any parse/validation/transport failure → HOLD. No provider-specific branching;
   the same code hits OpenRouter, MyHermes AI, or any custom endpoint.
-- **dashboard/** — Next.js App Router app (dark/gradient/glass aesthetic):
-  equity curve chart, open positions table, decision/trade log. A server
-  component reads `data/state.json` + `data/trades.csv` from disk; the client
-  polls on an interval to refresh. Read-only — never writes, never trades. No
-  auth, no DB. Run with its own dev server / build, independent of the engine.
+- **desktop/** — Electron app (Vite + React, dark/gradient/glass aesthetic):
+  equity curve chart, open positions table, decision/trade log. The Electron
+  **main** process reads `data/{state.json,trades.csv,decisions.jsonl}` from
+  disk and exposes a snapshot over IPC via a `contextBridge` preload; the
+  **renderer** (React) polls it on an interval to refresh. Read-only — never
+  writes, never trades. No auth, no DB. Runs as a desktop window, independent
+  of the engine.
 
 ## 5. One decision cycle (bot.py)
 
@@ -132,8 +134,7 @@ release lockfile and exit
 ```
 cron ─▶ bot.run_once() ─▶ ccxt(data) ─▶ indicators ─▶ Claude ─▶ risk gate ─▶ paper broker ─▶ data/state.json + data/trades.csv
                                                                                                           ▲
-                                          Next.js dashboard (separate Node runtime) ──server reads files──┘
-                                          client polls every N s to refresh the view
+                                  Electron app: main process reads files ──┘  renderer polls main (IPC) every N s
 ```
 
 ## 7. Error handling
@@ -173,9 +174,10 @@ decision) · `pyyaml` · stdlib `json` / `csv` / `logging` / file lock.
 
 Models use provider-prefixed slugs (e.g. `z-ai/glm-5.2`, `anthropic/claude-sonnet-4-20250514`). The engine uses the Python `openai` SDK with `base_url`/`api_key` exactly as the JS SDK does.
 
-**Dashboard (Node):** Next.js (App Router) · Tailwind CSS (dark/glass styling) ·
-a lightweight chart lib for the equity curve (default Recharts; swappable). No
-backend beyond reading the `data/` files from a server component.
+**Dashboard (Electron desktop app):** Electron · Vite · React · TypeScript ·
+hand-written CSS for the dark/glass look · Recharts for the equity curve. The
+main process reads the `data/` files (Node `fs`) and serves snapshots to the
+React renderer over a `contextBridge`/IPC channel — no HTTP server, no DB.
 
 ## 10. Path to "live" later (informational, not v1)
 
