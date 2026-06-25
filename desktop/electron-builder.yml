@@ -1,0 +1,23 @@
+appId: ai.myhermes.cryptobot.dashboard
+productName: Crypto Bot Dashboard
+directories:
+  output: dist
+  buildResources: build
+# electron-vite emits the bundled app to out/ — package that plus package.json.
+files:
+  - out/**/*
+  - package.json
+# The dashboard reads the engine's data dir at runtime. A packaged build can't
+# assume the repo layout, so point it at the data dir via the DATA_DIR env var
+# (see README). Nothing app-specific needs bundling here.
+linux:
+  target:
+    - AppImage
+  category: Finance
+mac:
+  target:
+    - dmg
+  category: public.app-category.finance
+win:
+  target:
+    - nsis

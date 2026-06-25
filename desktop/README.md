@@ -19,9 +19,18 @@ Keep the bot's cron running and the window updates on its own.
 npm run build       # bundles main + preload + renderer into out/
 npm run start       # preview the built app
 ```
-Packaging to an installer (electron-builder: AppImage / dmg / exe) is a
-follow-up; when packaged, set `DATA_DIR` so the app can find the engine's data
-dir.
+## Package (distributable)
+```bash
+npm run dist        # installer into dist/ (Linux AppImage · mac dmg · win nsis)
+npm run dist:dir    # faster: unpacked app in dist/linux-unpacked/ (no installer)
+```
+A packaged build can't assume the repo layout, so point it at the engine's data
+dir via `DATA_DIR`:
+```bash
+DATA_DIR=/abs/path/to/cryptotrading_ai/data ./dist/linux-unpacked/crypto-bot-desktop
+```
+Config lives in `electron-builder.yml`. A custom app icon under `build/` is an
+optional follow-up (the default Electron icon is used otherwise).
 
 ## Test (pure parse/read layer)
 ```bash
