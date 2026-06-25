@@ -28,6 +28,8 @@ def run_once(cfg=None, market=None, llm=None) -> None:
                 df = market.fetch_ohlcv_df(exchange, sym, cfg.timeframe)
                 feats = indicators.compute_indicators(df)
                 price = market.fetch_price(exchange, sym)
+                if price <= 0:
+                    raise ValueError(f"non-positive price: {price}")
             except Exception as e:                  # one bad symbol never aborts the cycle
                 log.warning("skip %s: %s", sym, e)
                 print(f"[{sym}] SKIP ({e})")
@@ -57,10 +59,13 @@ def run_once(cfg=None, market=None, llm=None) -> None:
             state_mod.append_trade(fill, cfg.data_dir)
             print(f"[{sym}] {order.side.upper()} {order.qty:.6f} @ {fill.price:.2f} — {reason}")
 
-        total = state_mod.equity(st, prices)
-        st.equity_history.append({"ts": ts, "equity": total})
-        state_mod.save_state_atomic(st, cfg.data_dir)
-        print(f"cash={st.cash:.2f} equity={total:.2f}")
+        if prices:
+            total = state_mod.equity(st, prices)
+            st.equity_history.append({"ts": ts, "equity": total})
+            state_mod.save_state_atomic(st, cfg.data_dir)
+            print(f"cash={st.cash:.2f} equity={total:.2f}")
+        else:
+            print(f"cash={st.cash:.2f} (no symbols priced this cycle)")
 
 
 if __name__ == "__main__":

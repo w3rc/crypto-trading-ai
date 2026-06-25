@@ -69,3 +69,16 @@ def test_stop_loss_forces_exit(tmp_path):
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.positions["BTC/USDT"].qty == 0.0
     assert st2.cash > 0.0
+
+def test_nonpositive_price_skips_symbol_no_liquidation(tmp_path):
+    cfg = _cfg(tmp_path)
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.cash = 0.0
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=210.0, stop_price=200.0)
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path))
+    # a zero ticker must NOT liquidate the stopped-out position
+    bot.run_once(cfg, market=FakeMarket(price=0.0), llm=FakeLLM(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.positions["BTC/USDT"].qty == 1.0
+    assert st2.cash == 0.0

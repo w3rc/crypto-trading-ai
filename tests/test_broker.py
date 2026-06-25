@@ -71,3 +71,23 @@ def test_sell_exceeding_holdings_asserts():
     with pytest.raises(AssertionError):
         apply_fill(Order("sell", 5.0, 100.0), Position("BTC/USDT", qty=1.0),
                    0.0, 0.001, 0.0005, 0.05, "t")
+
+def test_buy_into_existing_position_weighted_avg_and_stop():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    pos = Position("BTC/USDT")
+    pos2, cash2, _ = apply_fill(Order("buy", 1.0, 100.0), pos, 1000.0, 0.0, 0.0, 0.05, "t1")
+    pos3, cash3, _ = apply_fill(Order("buy", 1.0, 120.0), pos2, cash2, 0.0, 0.0, 0.05, "t2")
+    assert pos3.qty == pytest.approx(2.0)
+    assert pos3.avg_price == pytest.approx(110.0)            # (100+120)/2
+    assert pos3.stop_price == pytest.approx(110.0 * 0.95)    # stop recomputed off the new avg (intended v1 policy)
+
+def test_partial_sell_preserves_avg_and_stop():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    pos = Position("BTC/USDT", qty=10.0, avg_price=100.0, stop_price=95.0)
+    pos2, cash2, _ = apply_fill(Order("sell", 4.0, 110.0), pos, 0.0, 0.0, 0.0, 0.05, "t")
+    assert pos2.qty == pytest.approx(6.0)
+    assert pos2.avg_price == pytest.approx(100.0)   # cost basis unchanged on partial sell
+    assert pos2.stop_price == pytest.approx(95.0)   # stop preserved on partial sell
+    assert cash2 == pytest.approx(440.0)            # 4 * 110, no fees/slippage
