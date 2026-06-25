@@ -10,7 +10,4 @@ if (process.contextIsolated) {
   } catch (error) {
     console.error(error);
   }
-} else {
-  // @ts-ignore — fallback when contextIsolation is off
-  window.api = api;
 }
