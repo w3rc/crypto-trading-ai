@@ -1,0 +1,42 @@
+from engine.llm import decide
+from engine.config import LLMConfig
+from engine.models import Position
+
+CFG = LLMConfig(base_url="x", api_key="x", model="m", json_mode=True)
+FEATS = {"price": 100, "rsi": 28, "macd": 1, "macd_signal": 0,
+         "ma_fast": 101, "ma_slow": 99, "atr": 2}
+
+class _Msg:    # minimal openai response shape
+    def __init__(self, content): self.message = type("M", (), {"content": content})
+class _Resp:
+    def __init__(self, content): self.choices = [_Msg(content)]
+class FakeClient:
+    def __init__(self, content=None, exc=None):
+        self.content, self.exc = content, exc
+        self.chat = type("C", (), {"completions": self})()
+    def create(self, **kwargs):
+        if self.exc: raise self.exc
+        return _Resp(self.content)
+
+def test_valid_json_returns_decision():
+    c = FakeClient(content='{"action":"buy","size":0.5,"reason":"oversold","stop":95}')
+    d = decide(FEATS, Position("BTC/USDT"), 10000, CFG, client=c)
+    assert d.action == "buy" and d.size == 0.5 and d.stop == 95
+
+def test_json_wrapped_in_text_is_extracted():
+    c = FakeClient(content='Here is my call:\n{"action":"sell","size":1.0}\nDone.')
+    d = decide(FEATS, Position("BTC/USDT", qty=1), 0, CFG, client=c)
+    assert d.action == "sell"
+
+def test_malformed_output_is_hold():
+    c = FakeClient(content="I think you should buy a lot!")
+    assert decide(FEATS, Position("BTC/USDT"), 10000, CFG, client=c).action == "hold"
+
+def test_invalid_action_is_hold():
+    c = FakeClient(content='{"action":"moon","size":1}')
+    assert decide(FEATS, Position("BTC/USDT"), 10000, CFG, client=c).action == "hold"
+
+def test_exception_is_hold():
+    c = FakeClient(exc=RuntimeError("network down"))
+    d = decide(FEATS, Position("BTC/USDT"), 10000, CFG, client=c)
+    assert d.action == "hold" and "network down" in d.reason
