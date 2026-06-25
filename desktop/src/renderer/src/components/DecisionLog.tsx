@@ -9,8 +9,8 @@ export default function DecisionLog({ decisions }: { decisions: Decision[] }) {
         <tr><th>Time</th><th>Symbol</th><th>Action</th><th>Price</th><th>Reason</th></tr>
       </thead>
       <tbody>
-        {recent.map((d, i) => (
-          <tr key={i}>
+        {recent.map((d) => (
+          <tr key={`${d.ts}-${d.symbol}`}>
             <td className="muted">{new Date(d.ts).toLocaleTimeString()}</td>
             <td>{d.symbol}</td>
             <td><span className={`badge ${d.action}`}>{d.action}{d.executed ? "" : "*"}</span></td>

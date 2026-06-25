@@ -28,7 +28,7 @@ export default function App(): React.JSX.Element {
   const cash = snap.state?.cash ?? 0;
   const eq = snap.state?.equity_history;
   const equity = eq && eq.length ? eq[eq.length - 1].equity : cash;
-  const start = 10000; // display baseline; matches default paper_capital
+  const start = eq && eq.length ? eq[0].equity : 10000; // baseline = first recorded equity
   const pnl = equity - start;
 
   return (
