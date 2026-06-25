@@ -57,3 +57,21 @@ def test_json_mode_false_omits_response_format():
 def test_brace_wrapped_invalid_json_is_hold():
     c = FakeClient(content="My call: { price: 100, action: buy }")  # invalid JSON inside braces
     assert decide(FEATS, Position("BTC/USDT"), 10000, CFG, client=c).action == "hold"
+
+def test_constructed_client_uses_neutral_user_agent(monkeypatch):
+    # When decide() builds its own client (client=None), it must NOT use the SDK's
+    # default "OpenAI/Python" User-Agent — some gateways' WAF/AI-bot rules 403 it.
+    captured = {}
+
+    class _FakeOpenAI:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+            self.chat = type("C", (), {"completions": self})()
+        def create(self, **kwargs):
+            return _Resp('{"action":"hold"}')
+
+    import openai
+    monkeypatch.setattr(openai, "OpenAI", _FakeOpenAI)
+    d = decide(FEATS, Position("BTC/USDT"), 10000, CFG, client=None)
+    assert d.action == "hold"
+    assert "OpenAI" not in captured["default_headers"]["User-Agent"]
