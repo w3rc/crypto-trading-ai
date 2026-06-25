@@ -1,10 +1,16 @@
-// Placeholder preload — replaced in Task 4 with the getSnapshot bridge.
-import { contextBridge } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
+
+const api = {
+  getSnapshot: () => ipcRenderer.invoke("snapshot"),
+};
 
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld("api", {});
+    contextBridge.exposeInMainWorld("api", api);
   } catch (error) {
     console.error(error);
   }
+} else {
+  // @ts-ignore — fallback when contextIsolation is off
+  window.api = api;
 }
