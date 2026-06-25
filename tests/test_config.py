@@ -17,3 +17,24 @@ def test_load_config_missing_key_is_empty_not_error(monkeypatch):
     monkeypatch.delenv("MYHERMES_API_KEY", raising=False)
     cfg = load_config("engine/config.yaml")
     assert cfg.llm.api_key == ""   # absent key -> "" (tests/mocks don't need it)
+
+def test_strategy_and_rules_load(monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "test-key-123")
+    cfg = load_config("engine/config.yaml")
+    assert cfg.strategy == "hybrid"
+    assert cfg.rules.rsi_buy == 30
+    assert cfg.rules.rsi_sell == 70
+    assert cfg.rules.buy_size == 0.5
+
+def test_strategy_and_rules_default_when_absent(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(
+        "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
+        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: data\n"
+        "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
+        "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
+    )
+    cfg = load_config(str(p))
+    assert cfg.strategy == "hybrid"     # default when key absent
+    assert cfg.rules.rsi_buy == 30      # default rules when block absent
