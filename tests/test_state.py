@@ -1,5 +1,16 @@
-from engine.state import load_state, save_state_atomic, append_trade, equity
+import json as _json
+from engine.state import load_state, save_state_atomic, append_trade, append_decision, equity
 from engine.models import Position, Fill
+
+def test_append_decision_writes_jsonl(tmp_path):
+    append_decision({"ts": "t1", "symbol": "BTC/USDT", "action": "hold",
+                     "reason": "weak signal", "price": 60000.0, "executed": False}, str(tmp_path))
+    append_decision({"ts": "t2", "symbol": "ETH/USDT", "action": "buy",
+                     "reason": "oversold", "price": 1600.0, "executed": True}, str(tmp_path))
+    lines = (tmp_path / "decisions.jsonl").read_text().strip().splitlines()
+    assert len(lines) == 2
+    rec = _json.loads(lines[1])
+    assert rec["action"] == "buy" and rec["executed"] is True and rec["symbol"] == "ETH/USDT"
 
 def test_fresh_state_creates_flat_positions(tmp_path):
     st = load_state(str(tmp_path), 10000.0, ["BTC/USDT", "ETH/USDT"])

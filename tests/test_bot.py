@@ -1,4 +1,5 @@
 import json
+import json as _json
 import pandas as pd
 from engine import bot
 from engine.config import Config, RiskConfig, LLMConfig
@@ -82,3 +83,19 @@ def test_nonpositive_price_skips_symbol_no_liquidation(tmp_path):
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.positions["BTC/USDT"].qty == 1.0
     assert st2.cash == 0.0
+
+def test_decisions_are_logged_each_cycle(tmp_path):
+    cfg = _cfg(tmp_path)
+    bot.run_once(cfg, market=FakeMarket(), llm=FakeLLM(Decision(action="buy", size=1.0)))
+    lines = (tmp_path / "decisions.jsonl").read_text().strip().splitlines()
+    assert len(lines) == 1                      # one priced symbol -> one decision record
+    rec = _json.loads(lines[0])
+    assert rec["symbol"] == "BTC/USDT"
+    assert rec["action"] == "buy" and rec["executed"] is True
+    assert "price" in rec and "reason" in rec and "ts" in rec
+
+def test_hold_decision_is_logged_not_executed(tmp_path):
+    cfg = _cfg(tmp_path)
+    bot.run_once(cfg, market=FakeMarket(), llm=FakeLLM(Decision(action="hold", reason="flat")))
+    rec = _json.loads((tmp_path / "decisions.jsonl").read_text().strip())
+    assert rec["action"] == "hold" and rec["executed"] is False and rec["reason"] == "flat"

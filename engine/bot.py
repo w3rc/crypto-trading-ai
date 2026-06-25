@@ -47,6 +47,12 @@ def run_once(cfg=None, market=None, llm=None) -> None:
                 order = broker.plan_order(decision, pos, st.cash, price, equity, cfg.risk)
                 reason = decision.reason
 
+            action = order.side if order else "hold"
+            state_mod.append_decision(
+                {"ts": ts, "symbol": sym, "action": action, "reason": reason,
+                 "price": price, "executed": order is not None},
+                cfg.data_dir)
+
             if order is None:
                 print(f"[{sym}] HOLD @ {price:.2f} — {reason}")
                 continue

@@ -63,6 +63,13 @@ def append_trade(fill: Fill, data_dir: str) -> None:
         w.writerow([fill.ts, fill.symbol, fill.side, fill.qty, fill.price, fill.fee])
 
 
+def append_decision(record: dict, data_dir: str) -> None:
+    os.makedirs(data_dir, exist_ok=True)
+    path = os.path.join(data_dir, "decisions.jsonl")
+    with open(path, "a") as f:
+        f.write(json.dumps(record) + "\n")
+
+
 def equity(state: State, price_map: dict) -> float:
     total = state.cash
     for s, p in state.positions.items():

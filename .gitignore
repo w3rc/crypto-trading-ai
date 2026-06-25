@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 data/state.json
 data/trades.csv
+data/decisions.jsonl
 data/bot.lock
 .pytest_cache/
 .superpowers/
