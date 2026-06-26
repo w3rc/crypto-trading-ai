@@ -92,3 +92,38 @@ def test_two_symbol_timeline_is_intersection(tmp_path):
                               "indicator_rule", cfg, feed=feed,
                               strategy=_always(Decision(action="hold")))
     assert r["timeline"] == [i * TF_MS for i in range(1, 60)]  # 59 shared timestamps
+
+
+def test_to_ms_parses_utc_date():
+    assert backtest._to_ms("2024-01-01") == 1_704_067_200_000
+
+
+def test_main_runs_writes_equity_and_prints(monkeypatch, tmp_path, capsys):
+    canned = {"metrics": {"final_equity": 10500.0, "total_return": 0.05,
+                          "buy_hold_return": 0.03, "max_drawdown": -0.1,
+                          "n_trades": 4, "beats_hold": True},
+              "equity_curve": [10000.0, 10500.0],
+              "buy_hold_curve": [10000.0, 10300.0],
+              "trades": [], "timeline": [0, TF_MS]}
+    monkeypatch.setattr(backtest, "run_backtest", lambda *a, **k: canned)
+    monkeypatch.setattr(backtest.market, "make_exchange", lambda name: object())
+    out = str(tmp_path / "eq.csv")
+    backtest.main(["--since", "2024-01-01", "--symbols", "BTC/USDT",
+                   "--strategy", "indicator_rule", "--out", out])
+    text = capsys.readouterr().out
+    assert "beats" in text.lower() and "10500" in text
+    lines = open(out).read().strip().splitlines()
+    assert lines[0] == "ts,equity,buy_hold"   # header
+    assert len(lines) == 3                     # header + 2 points
+
+
+def test_main_warns_on_non_deterministic_strategy(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(backtest, "run_backtest", lambda *a, **k: {
+        "metrics": {"final_equity": 0, "total_return": 0, "buy_hold_return": 0,
+                    "max_drawdown": 0, "n_trades": 0, "beats_hold": False},
+        "equity_curve": [10000.0], "buy_hold_curve": [10000.0],
+        "trades": [], "timeline": []})
+    monkeypatch.setattr(backtest.market, "make_exchange", lambda name: object())
+    backtest.main(["--since", "2024-01-01", "--symbols", "BTC/USDT",
+                   "--strategy", "hybrid", "--out", str(tmp_path / "eq.csv")])
+    assert "WARNING" in capsys.readouterr().out   # LLM cost warning
