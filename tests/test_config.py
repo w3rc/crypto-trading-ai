@@ -38,3 +38,44 @@ def test_strategy_and_rules_default_when_absent(tmp_path, monkeypatch):
     cfg = load_config(str(p))
     assert cfg.strategy == "hybrid"     # default when key absent
     assert cfg.rules.rsi_buy == 30      # default rules when block absent
+
+def test_sentiment_loads_from_yaml(monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    cfg = load_config("engine/config.yaml")
+    assert cfg.sentiment.enabled is True
+    assert cfg.sentiment.weights["fear_greed"] == 1.0
+    assert cfg.sentiment.cache_ttl["fear_greed"] == 86400
+    assert cfg.sentiment.buy_min == -0.2
+    assert cfg.sentiment.sell_max == -0.5
+
+
+def test_sentiment_defaults_when_block_absent(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(
+        "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
+        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: data\n"
+        "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
+        "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
+    )
+    cfg = load_config(str(p))
+    assert cfg.sentiment.enabled is True           # default
+    assert cfg.sentiment.weights["reddit"] == 1.0  # default weights
+    assert cfg.sentiment.buy_min == -0.2
+
+
+def test_sentiment_partial_override_merges(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(
+        "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
+        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: data\n"
+        "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
+        "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
+        "sentiment:\n  enabled: false\n  weights: {fear_greed: 2.0}\n  buy_min: 0.1\n"
+    )
+    cfg = load_config(str(p))
+    assert cfg.sentiment.enabled is False
+    assert cfg.sentiment.weights["fear_greed"] == 2.0   # overridden
+    assert cfg.sentiment.weights["reddit"] == 1.0       # default preserved (merge)
+    assert cfg.sentiment.buy_min == 0.1

@@ -17,6 +17,24 @@ class RulesConfig:
     buy_size: float = 0.5
 
 
+def _default_weights():
+    return {"fear_greed": 1.0, "cryptopanic": 1.0, "reddit": 1.0, "x_twitter": 1.0}
+
+
+def _default_ttl():
+    return {"fear_greed": 86400, "cryptopanic": 3600, "reddit": 3600, "x_twitter": 3600}
+
+
+@dataclass
+class SentimentConfig:
+    enabled: bool = True
+    weights: dict = field(default_factory=_default_weights)
+    cache_ttl: dict = field(default_factory=_default_ttl)
+    buy_min: float = -0.2
+    sell_max: float = -0.5
+    http_timeout: float = 6.0
+
+
 @dataclass
 class LLMConfig:
     base_url: str
@@ -38,6 +56,7 @@ class Config:
     llm: LLMConfig
     strategy: str = "hybrid"
     rules: RulesConfig = field(default_factory=RulesConfig)
+    sentiment: SentimentConfig = field(default_factory=SentimentConfig)
 
 
 def load_config(path: str = "engine/config.yaml") -> Config:
@@ -45,6 +64,7 @@ def load_config(path: str = "engine/config.yaml") -> Config:
         raw = yaml.safe_load(f)
     llm = raw["llm"]
     rules_raw = raw.get("rules", {})
+    sent_raw = raw.get("sentiment", {})
     return Config(
         exchange=raw["exchange"],
         symbols=list(raw["symbols"]),
@@ -68,5 +88,13 @@ def load_config(path: str = "engine/config.yaml") -> Config:
             rsi_buy=float(rules_raw.get("rsi_buy", 30)),
             rsi_sell=float(rules_raw.get("rsi_sell", 70)),
             buy_size=float(rules_raw.get("buy_size", 0.5)),
+        ),
+        sentiment=SentimentConfig(
+            enabled=bool(sent_raw.get("enabled", True)),
+            weights={**_default_weights(), **sent_raw.get("weights", {})},
+            cache_ttl={**_default_ttl(), **sent_raw.get("cache_ttl", {})},
+            buy_min=float(sent_raw.get("buy_min", -0.2)),
+            sell_max=float(sent_raw.get("sell_max", -0.5)),
+            http_timeout=float(sent_raw.get("http_timeout", 6.0)),
         ),
     )
