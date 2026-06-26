@@ -73,3 +73,58 @@ def test_conflicting_signals_is_hold():
 
 def test_indicator_rule_registered():
     assert strategies.get("indicator_rule") is strategies.indicator_rule
+
+
+def _ns_s(rsi_buy=30, rsi_sell=70, buy_size=0.5, buy_min=-0.2, sell_max=-0.5):
+    return SimpleNamespace(
+        rules=SimpleNamespace(rsi_buy=rsi_buy, rsi_sell=rsi_sell, buy_size=buy_size),
+        sentiment=SimpleNamespace(buy_min=buy_min, sell_max=sell_max))
+
+
+def _feats_s(rsi, sentiment, macd=0.0, sig=0.0, fast=100.0, slow=100.0):
+    return {"price": 100.0, "rsi": rsi, "macd": macd, "macd_signal": sig,
+            "ma_fast": fast, "ma_slow": slow, "atr": 1.0, "sentiment": sentiment}
+
+
+def test_sentiment_rule_bullish_confirmed_buys():
+    d = strategies.sentiment_rule(_feats_s(rsi=25, sentiment=0.5), _FLAT, 1000.0, _ns_s())
+    assert d.action == "buy" and d.size == 0.5
+
+
+def test_sentiment_rule_bullish_vetoed_by_negative():
+    d = strategies.sentiment_rule(_feats_s(rsi=25, sentiment=-0.5), _FLAT, 1000.0, _ns_s())
+    assert d.action == "hold"          # indicators bullish but sentiment < buy_min -> veto
+
+
+def test_sentiment_rule_bearish_sells():
+    d = strategies.sentiment_rule(_feats_s(rsi=80, sentiment=0.9), _FLAT, 1000.0, _ns_s())
+    assert d.action == "sell" and d.size == 1.0
+
+
+def test_sentiment_rule_neutral_extreme_negative_exits():
+    d = strategies.sentiment_rule(_feats_s(rsi=50, sentiment=-0.6), _FLAT, 1000.0, _ns_s())
+    assert d.action == "sell"          # neutral indicators, sentiment <= sell_max -> risk-off
+
+
+def test_sentiment_rule_neutral_holds():
+    d = strategies.sentiment_rule(_feats_s(rsi=50, sentiment=0.0), _FLAT, 1000.0, _ns_s())
+    assert d.action == "hold"
+
+
+def test_sentiment_rule_conflict_holds():
+    # bullish via rsi<30 AND bearish via macd<sig & fast<slow -> conflict -> hold (even if very negative)
+    d = strategies.sentiment_rule(
+        _feats_s(rsi=25, sentiment=-0.9, macd=-1, sig=0, fast=99, slow=100),
+        _FLAT, 1000.0, _ns_s())
+    assert d.action == "hold"
+
+
+def test_sentiment_rule_missing_key_treated_as_neutral():
+    feats = {"price": 100.0, "rsi": 50, "macd": 0.0, "macd_signal": 0.0,
+             "ma_fast": 100.0, "ma_slow": 100.0, "atr": 1.0}   # no "sentiment"
+    d = strategies.sentiment_rule(feats, _FLAT, 1000.0, _ns_s())
+    assert d.action == "hold"          # sentiment defaults to 0.0 -> neutral hold
+
+
+def test_sentiment_rule_registered():
+    assert strategies.get("sentiment_rule") is strategies.sentiment_rule
