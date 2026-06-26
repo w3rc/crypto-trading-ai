@@ -91,8 +91,10 @@ def load_config(path: str = "engine/config.yaml") -> Config:
         ),
         sentiment=SentimentConfig(
             enabled=bool(sent_raw.get("enabled", True)),
-            weights={**_default_weights(), **sent_raw.get("weights", {})},
-            cache_ttl={**_default_ttl(), **sent_raw.get("cache_ttl", {})},
+            weights={k: float(v) for k, v in
+                     {**_default_weights(), **sent_raw.get("weights", {})}.items()},
+            cache_ttl={k: float(v) for k, v in
+                       {**_default_ttl(), **sent_raw.get("cache_ttl", {})}.items()},
             buy_min=float(sent_raw.get("buy_min", -0.2)),
             sell_max=float(sent_raw.get("sell_max", -0.5)),
             http_timeout=float(sent_raw.get("http_timeout", 6.0)),

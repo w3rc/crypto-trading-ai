@@ -68,9 +68,9 @@ Configure weights, cache TTLs, and the `buy_min`/`sell_max` thresholds under
 `sentiment:` in `engine/config.yaml`. Backtests replay only the Fear & Greed
 component (the others have no clean history):
 
-​```bash
+```bash
 python -m engine.backtest --since 2024-01-01 --strategy sentiment_rule
-​```
+```
 
 ## Tests
 ```bash

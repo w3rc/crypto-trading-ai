@@ -79,3 +79,21 @@ def test_sentiment_partial_override_merges(tmp_path, monkeypatch):
     assert cfg.sentiment.weights["fear_greed"] == 2.0   # overridden
     assert cfg.sentiment.weights["reddit"] == 1.0       # default preserved (merge)
     assert cfg.sentiment.buy_min == 0.1
+
+
+def test_sentiment_dict_values_coerced_to_float(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(
+        "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
+        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: data\n"
+        "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
+        "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
+        "sentiment:\n  weights: {fear_greed: 2}\n  cache_ttl: {fear_greed: 100}\n"
+    )
+    cfg = load_config(str(p))
+    assert isinstance(cfg.sentiment.weights["fear_greed"], float)
+    assert cfg.sentiment.weights["fear_greed"] == 2.0
+    assert isinstance(cfg.sentiment.cache_ttl["fear_greed"], float)
+    # untouched defaults are still present and numeric (merge preserved)
+    assert cfg.sentiment.weights["reddit"] == 1.0
