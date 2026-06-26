@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 
-from engine import broker, indicators, market as market_mod, llm as llm_mod, state as state_mod
+from engine import broker, indicators, market as market_mod, strategies as strategies_mod, state as state_mod
 from engine.config import load_config
 from engine.models import Order
 
@@ -12,10 +12,10 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def run_once(cfg=None, market=None, llm=None) -> None:
+def run_once(cfg=None, market=None, strategy=None) -> None:
     cfg = cfg or load_config()
     market = market or market_mod
-    llm = llm or llm_mod
+    strategy = strategy or strategies_mod.get(cfg.strategy)
 
     with state_mod.acquire_lock(cfg.data_dir):
         st = state_mod.load_state(cfg.data_dir, cfg.paper_capital, cfg.symbols)
@@ -43,7 +43,7 @@ def run_once(cfg=None, market=None, llm=None) -> None:
             if broker.stop_triggered(pos, price):
                 order, reason = Order("sell", pos.qty, price), "stop-loss"
             else:
-                decision = llm.decide(feats, pos, st.cash, cfg.llm)
+                decision = strategy(feats, pos, st.cash, cfg)
                 order = broker.plan_order(decision, pos, st.cash, price, equity, cfg.risk)
                 reason = decision.reason
 

@@ -13,3 +13,8 @@ llm:
   api_key_env: MYHERMES_API_KEY
   model: z-ai/glm-5.2
   json_mode: true
+strategy: hybrid
+rules:
+  rsi_buy: 30
+  rsi_sell: 70
+  buy_size: 0.5
