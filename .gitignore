@@ -6,5 +6,8 @@ data/state.json
 data/trades.csv
 data/decisions.jsonl
 data/bot.lock
+data/cache/
+data/backtest_equity.csv
 .pytest_cache/
 .superpowers/
+.gstack/

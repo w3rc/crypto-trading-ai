@@ -29,6 +29,25 @@ Edit `engine/config.yaml` — symbols, capital, risk limits, and the LLM
 provider/model. Default: MyHermes AI + `z-ai/glm-5.2`. Swap `base_url` +
 `api_key_env` + `model` for OpenRouter or any OpenAI-compatible endpoint.
 
+## Backtesting
+
+Replay a strategy over historical candles and see if it beats buy-and-hold:
+
+```bash
+python -m engine.backtest --symbols BTC/USDT,ETH/USDT --timeframe 1h \
+  --since 2024-01-01 --strategy indicator_rule
+```
+
+Historical candles are cached under `data/cache/` and reused on later runs
+over the same (or a contained) window; an open-ended run (no `--until`)
+refetches once newer candles have closed. The equity + buy-hold curves are written to
+`data/backtest_equity.csv`. Defaults (fees, slippage, risk, capital) come from
+`engine/config.yaml`.
+
+`indicator_rule` is the fast, deterministic strategy. Backtesting `hybrid` is
+supported but makes one LLM call per candle per symbol (slow + costly) — you'll
+get a warning.
+
 ## Tests
 ```bash
 python -m pytest -q
