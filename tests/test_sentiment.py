@@ -60,3 +60,56 @@ def test_fng_lookup_floors_to_earlier_day():
     hist = {day - 2 * 86_400_000: 40.0}        # value 2 days earlier
     assert sentiment._fng_lookup(hist, day) == 40.0   # walks back to the nearest earlier day
     assert sentiment._fng_lookup({}, day) is None
+
+
+def test_cryptopanic_vote_ratio(monkeypatch):
+    monkeypatch.setenv("CRYPTOPANIC_TOKEN", "tok")
+    payload = {"results": [
+        {"votes": {"positive": 6, "negative": 2}},
+        {"votes": {"positive": 0, "negative": 0}},
+    ]}
+    monkeypatch.setattr(sentiment, "_http_json", lambda *a, **k: payload)
+    out = sentiment.cryptopanic(["BTC/USDT"], _cfg())
+    assert out["BTC/USDT"] == (6 - 2) / (6 + 2)   # 0.5
+
+
+def test_cryptopanic_no_key_returns_empty(monkeypatch):
+    monkeypatch.delenv("CRYPTOPANIC_TOKEN", raising=False)
+    assert sentiment.cryptopanic(["BTC/USDT"], _cfg()) == {}
+
+
+def test_cryptopanic_backtest_returns_empty(monkeypatch):
+    monkeypatch.setenv("CRYPTOPANIC_TOKEN", "tok")
+    assert sentiment.cryptopanic(["BTC/USDT"], _cfg(), backtest=True, ts_ms=1) == {}
+
+
+def test_reddit_scores_titles_with_vader(monkeypatch):
+    monkeypatch.setattr(sentiment, "_reddit_token", lambda cfg: "tok")
+    payload = {"data": {"children": [
+        {"data": {"title": "bullish breakout, mooning"}},
+        {"data": {"title": "great accumulation zone, very bullish"}},
+    ]}}
+    monkeypatch.setattr(sentiment, "_http_json", lambda *a, **k: payload)
+    out = sentiment.reddit(["BTC/USDT"], _cfg())
+    assert out["BTC/USDT"] > 0
+
+
+def test_reddit_no_token_returns_empty(monkeypatch):
+    monkeypatch.setattr(sentiment, "_reddit_token", lambda cfg: None)
+    assert sentiment.reddit(["BTC/USDT"], _cfg()) == {}
+
+
+def test_x_twitter_no_key_returns_empty(monkeypatch):
+    monkeypatch.delenv("X_BEARER_TOKEN", raising=False)
+    assert sentiment.x_twitter(["BTC/USDT"], _cfg()) == {}
+
+
+def test_x_twitter_scores_tweets(monkeypatch):
+    monkeypatch.setenv("X_BEARER_TOKEN", "tok")
+    payload = {"data": [{"text": "bearish, dumping, rug"}, {"text": "scam, crashing"}]}
+    monkeypatch.setattr(sentiment, "_http_json", lambda *a, **k: payload)
+    assert sentiment.x_twitter(["BTC/USDT"], _cfg())["BTC/USDT"] < 0
+
+
+def test_sources_registry_has_four():
+    assert set(sentiment.SOURCES) == {"fear_greed", "cryptopanic", "reddit", "x_twitter"}

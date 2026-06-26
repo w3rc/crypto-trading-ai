@@ -1,3 +1,4 @@
+import base64
 import csv
 import json
 import os
@@ -100,3 +101,104 @@ def fear_greed(symbols, cfg, backtest=False, ts_ms=None):
         return {s: score for s in symbols}
     except Exception:
         return {}                      # fail-safe: advisory only, never break a cycle
+
+
+# ---- CryptoPanic (news) — per-coin, uses native bullish/bearish votes ----
+
+def cryptopanic(symbols, cfg, backtest=False, ts_ms=None):
+    if backtest:
+        return {}
+    token = os.environ.get("CRYPTOPANIC_TOKEN", "")
+    if not token:
+        return {}
+    out = {}
+    for sym in symbols:
+        try:
+            url = ("https://cryptopanic.com/api/v1/posts/?public=true&auth_token="
+                   + urllib.parse.quote(token) + "&currencies=" + _coin(sym))
+            data = _http_json(url, timeout=cfg.sentiment.http_timeout)
+            pos = neg = 0
+            for post in data.get("results", []):
+                v = post.get("votes", {})
+                pos += v.get("positive", 0)
+                neg += v.get("negative", 0)
+            total = pos + neg
+            if total:
+                out[sym] = _clamp((pos - neg) / total)
+        except Exception:
+            continue
+    return out
+
+
+# ---- Reddit (social) — OAuth client-credentials, VADER over titles ----
+
+def _reddit_token(cfg):
+    cid = os.environ.get("REDDIT_CLIENT_ID", "")
+    secret = os.environ.get("REDDIT_CLIENT_SECRET", "")
+    if not (cid and secret):
+        return None
+    body = urllib.parse.urlencode({"grant_type": "client_credentials"}).encode()
+    auth = base64.b64encode(f"{cid}:{secret}".encode()).decode()
+    req = urllib.request.Request(
+        "https://www.reddit.com/api/v1/access_token", data=body,
+        headers={"Authorization": f"Basic {auth}",
+                 "User-Agent": "cryptotrading-bot/1.0"})
+    with urllib.request.urlopen(req, timeout=cfg.sentiment.http_timeout) as resp:
+        return json.loads(resp.read().decode()).get("access_token")
+
+
+def reddit(symbols, cfg, backtest=False, ts_ms=None):
+    if backtest:
+        return {}
+    try:
+        token = _reddit_token(cfg)
+    except Exception:
+        token = None
+    if not token:
+        return {}
+    headers = {"Authorization": f"bearer {token}",
+               "User-Agent": "cryptotrading-bot/1.0"}
+    out = {}
+    for sym in symbols:
+        try:
+            url = ("https://oauth.reddit.com/r/CryptoCurrency/search?restrict_sr=1"
+                   "&limit=25&sort=new&q=" + urllib.parse.quote(_coin(sym)))
+            data = _http_json(url, headers=headers, timeout=cfg.sentiment.http_timeout)
+            titles = [c.get("data", {}).get("title", "")
+                      for c in data.get("data", {}).get("children", [])]
+            score = _vader_score(titles)
+            if score is not None:
+                out[sym] = _clamp(score)
+        except Exception:
+            continue
+    return out
+
+
+# ---- X / Twitter (social) — bearer token, VADER over recent tweets ----
+
+def x_twitter(symbols, cfg, backtest=False, ts_ms=None):
+    if backtest:
+        return {}
+    token = os.environ.get("X_BEARER_TOKEN", "")
+    if not token:
+        return {}
+    headers = {"Authorization": f"Bearer {token}",
+               "User-Agent": "cryptotrading-bot/1.0"}
+    out = {}
+    for sym in symbols:
+        try:
+            q = urllib.parse.quote(f"{_coin(sym)} crypto -is:retweet lang:en")
+            url = ("https://api.twitter.com/2/tweets/search/recent?max_results=25"
+                   "&query=" + q)
+            data = _http_json(url, headers=headers, timeout=cfg.sentiment.http_timeout)
+            texts = [t.get("text", "") for t in data.get("data", [])]
+            score = _vader_score(texts)
+            if score is not None:
+                out[sym] = _clamp(score)
+        except Exception:
+            continue
+    return out
+
+
+SOURCES = {"fear_greed": fear_greed, "cryptopanic": cryptopanic,
+           "reddit": reddit, "x_twitter": x_twitter}
