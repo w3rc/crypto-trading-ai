@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 
-from engine import broker, indicators, market as market_mod, strategies as strategies_mod, state as state_mod
+from engine import broker, indicators, market as market_mod, sentiment as sentiment_mod, state as state_mod, strategies as strategies_mod
 from engine.config import load_config
 from engine.models import Order
 
@@ -22,6 +22,8 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
         exchange = market.make_exchange(cfg.exchange)
         prices: dict[str, float] = {}
         ts = _now()
+        sent = (sentiment_mod.aggregate_sentiment(cfg.symbols, cfg)
+                if cfg.sentiment.enabled else {})
 
         for sym in cfg.symbols:
             try:
@@ -36,6 +38,7 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
                 continue
 
             feats["price"] = price          # fill/stop use the live ticker, not the stale candle close
+            feats["sentiment"] = sent.get(sym, 0.0)
             prices[sym] = price
             pos = st.positions[sym]
             equity = state_mod.equity(st, prices)   # best-effort equity for sizing

@@ -1,7 +1,7 @@
 import json as _json
 import pandas as pd
 from engine import bot
-from engine.config import Config, RiskConfig, LLMConfig
+from engine.config import Config, RiskConfig, LLMConfig, SentimentConfig
 from engine.models import Decision, Position
 from engine.state import load_state
 
@@ -10,7 +10,8 @@ def _cfg(tmp_path, symbols=("BTC/USDT",)):
                   paper_capital=10000.0, fee_pct=0.001, slippage_pct=0.0005,
                   data_dir=str(tmp_path),
                   risk=RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05),
-                  llm=LLMConfig(base_url="x", api_key="x", model="m", json_mode=True))
+                  llm=LLMConfig(base_url="x", api_key="x", model="m", json_mode=True),
+                  sentiment=SentimentConfig(enabled=False))
 
 def _df():
     closes = [100.0 + i for i in range(60)]
@@ -97,3 +98,32 @@ def test_hold_decision_is_logged_not_executed(tmp_path):
     bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold", reason="flat")))
     rec = _json.loads((tmp_path / "decisions.jsonl").read_text().strip())
     assert rec["action"] == "hold" and rec["executed"] is False and rec["reason"] == "flat"
+
+def test_sentiment_injected_into_features(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    cfg.sentiment = SentimentConfig(enabled=True)
+    monkeypatch.setattr(bot.sentiment_mod, "aggregate_sentiment",
+                        lambda symbols, c: {"BTC/USDT": 0.42})
+    seen = {}
+
+    def capture(features, position, cash, c):
+        seen.update(features)
+        return Decision(action="hold")
+
+    bot.run_once(cfg, market=FakeMarket(), strategy=capture)
+    assert seen["sentiment"] == 0.42
+
+
+def test_sentiment_absent_symbol_is_neutral(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    cfg.sentiment = SentimentConfig(enabled=True)
+    monkeypatch.setattr(bot.sentiment_mod, "aggregate_sentiment",
+                        lambda symbols, c: {})          # nothing reported
+    seen = {}
+
+    def capture(features, position, cash, c):
+        seen.update(features)
+        return Decision(action="hold")
+
+    bot.run_once(cfg, market=FakeMarket(), strategy=capture)
+    assert seen["sentiment"] == 0.0                     # default neutral
