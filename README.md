@@ -48,6 +48,30 @@ refetches once newer candles have closed. The equity + buy-hold curves are writt
 supported but makes one LLM call per candle per symbol (slow + costly) — you'll
 get a warning.
 
+## Sentiment
+
+The bot can blend market + news + social sentiment into one `[-1, +1]` score per
+symbol, fed into both the LLM brain (it appears in the prompt) and the deterministic
+`sentiment_rule` strategy (which gates the indicator signals — it won't buy into
+strong negativity and exits on extreme negativity).
+
+Sources (each fail-safe — a missing key or dead API just drops that source):
+
+| source | signal | key (`.env`) | backtestable |
+|---|---|---|---|
+| Fear & Greed | market-wide index | none (free) | yes (history) |
+| CryptoPanic | per-coin news votes | `CRYPTOPANIC_TOKEN` | no |
+| Reddit | per-coin post sentiment (VADER) | `REDDIT_CLIENT_ID` / `REDDIT_CLIENT_SECRET` | no |
+| X / Twitter | per-coin tweet sentiment (VADER) | `X_BEARER_TOKEN` | no |
+
+Configure weights, cache TTLs, and the `buy_min`/`sell_max` thresholds under
+`sentiment:` in `engine/config.yaml`. Backtests replay only the Fear & Greed
+component (the others have no clean history):
+
+​```bash
+python -m engine.backtest --since 2024-01-01 --strategy sentiment_rule
+​```
+
 ## Tests
 ```bash
 python -m pytest -q

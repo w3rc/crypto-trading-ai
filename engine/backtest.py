@@ -2,7 +2,7 @@ import argparse
 import time
 from datetime import datetime, timezone
 
-from engine import broker, datafeed, indicators, market, metrics, strategies
+from engine import broker, datafeed, indicators, market, metrics, sentiment, strategies
 from engine.config import load_config
 from engine.models import Order, Position
 
@@ -53,6 +53,10 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
         # (O(n^2) total); precompute rolling indicators if backtests get slow.
         feats = {sym: indicators.compute_indicators(windows[sym]) for sym in symbols}
         prices = {sym: feats[sym]["price"] for sym in symbols}
+        sent = (sentiment.aggregate_sentiment(symbols, cfg, backtest=True, ts_ms=ts)
+                if cfg.sentiment.enabled else {})
+        for sym in symbols:
+            feats[sym]["sentiment"] = sent.get(sym, 0.0)
 
         equity = cash + sum(positions[s].qty * prices[s] for s in symbols)
         for sym in symbols:
@@ -78,7 +82,7 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
             "buy_hold_curve": buy_hold_curve, "trades": trades, "timeline": timeline}
 
 
-DETERMINISTIC = {"indicator_rule"}
+DETERMINISTIC = {"indicator_rule", "sentiment_rule"}
 
 
 def _to_ms(date_str):

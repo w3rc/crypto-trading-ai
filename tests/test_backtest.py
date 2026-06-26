@@ -1,6 +1,6 @@
 import pandas as pd
 from engine import backtest
-from engine.config import Config, RiskConfig, LLMConfig, RulesConfig
+from engine.config import Config, RiskConfig, LLMConfig, RulesConfig, SentimentConfig
 from engine.models import Decision
 
 COLS = ["ts", "open", "high", "low", "close", "volume"]
@@ -13,7 +13,8 @@ def _cfg(tmp_path, symbols):
                   data_dir=str(tmp_path),
                   risk=RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05),
                   llm=LLMConfig(base_url="x", api_key="x", model="m", json_mode=True),
-                  strategy="indicator_rule", rules=RulesConfig())
+                  strategy="indicator_rule", rules=RulesConfig(),
+                  sentiment=SentimentConfig(enabled=False))
 
 
 def _candles(n, start=0, base=100.0, step=1.0):
@@ -115,6 +116,28 @@ def test_main_runs_writes_equity_and_prints(monkeypatch, tmp_path, capsys):
     lines = open(out).read().strip().splitlines()
     assert lines[0] == "ts,equity,buy_hold"   # header
     assert len(lines) == 3                     # header + 2 points
+
+
+def test_backtest_injects_sentiment_per_bar(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path, ["BTC/USDT"])
+    cfg.sentiment = SentimentConfig(enabled=True)
+    feed = _feed_for({"BTC/USDT": _candles(60)})
+    seen = {}
+
+    monkeypatch.setattr(backtest.sentiment, "aggregate_sentiment",
+                        lambda symbols, c, backtest=False, ts_ms=None: {"BTC/USDT": 0.3})
+
+    def capture(features, position, cash, c):
+        seen.update(features)
+        return Decision(action="hold")
+
+    backtest.run_backtest(["BTC/USDT"], "1h", 0, 60 * TF_MS, "sentiment_rule", cfg,
+                          feed=feed, strategy=capture)
+    assert seen["sentiment"] == 0.3
+
+
+def test_sentiment_rule_is_deterministic_no_warning():
+    assert "sentiment_rule" in backtest.DETERMINISTIC
 
 
 def test_main_warns_on_non_deterministic_strategy(monkeypatch, tmp_path, capsys):
