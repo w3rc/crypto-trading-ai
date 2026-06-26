@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import pytest
 from engine import sentiment
 
 
@@ -113,3 +114,76 @@ def test_x_twitter_scores_tweets(monkeypatch):
 
 def test_sources_registry_has_four():
     assert set(sentiment.SOURCES) == {"fear_greed", "cryptopanic", "reddit", "x_twitter"}
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache():
+    sentiment._CACHE.clear()
+    yield
+    sentiment._CACHE.clear()
+
+
+def test_aggregate_weighted_blend(monkeypatch):
+    monkeypatch.setitem(sentiment.SOURCES, "fear_greed",
+                        lambda s, c, backtest=False, ts_ms=None: {x: 1.0 for x in s})
+    monkeypatch.setitem(sentiment.SOURCES, "cryptopanic",
+                        lambda s, c, backtest=False, ts_ms=None: {x: -1.0 for x in s})
+    monkeypatch.setitem(sentiment.SOURCES, "reddit",
+                        lambda s, c, backtest=False, ts_ms=None: {})
+    monkeypatch.setitem(sentiment.SOURCES, "x_twitter",
+                        lambda s, c, backtest=False, ts_ms=None: {})
+    cfg = _cfg(weights={"fear_greed": 3.0, "cryptopanic": 1.0,
+                        "reddit": 1.0, "x_twitter": 1.0})
+    out = sentiment.aggregate_sentiment(["BTC/USDT"], cfg)
+    assert out["BTC/USDT"] == pytest.approx((3 * 1.0 + 1 * -1.0) / 4)   # 0.5
+
+
+def test_aggregate_excluded_source_does_not_drag(monkeypatch):
+    # only fear_greed reports; an absent source must NOT pull the score toward 0
+    monkeypatch.setitem(sentiment.SOURCES, "fear_greed",
+                        lambda s, c, backtest=False, ts_ms=None: {x: 0.8 for x in s})
+    for name in ("cryptopanic", "reddit", "x_twitter"):
+        monkeypatch.setitem(sentiment.SOURCES, name,
+                            lambda s, c, backtest=False, ts_ms=None: {})
+    out = sentiment.aggregate_sentiment(["BTC/USDT"], _cfg())
+    assert out["BTC/USDT"] == pytest.approx(0.8)
+
+
+def test_aggregate_all_absent_is_zero(monkeypatch):
+    for name in sentiment.SOURCES:
+        monkeypatch.setitem(sentiment.SOURCES, name,
+                            lambda s, c, backtest=False, ts_ms=None: {})
+    assert sentiment.aggregate_sentiment(["BTC/USDT"], _cfg())["BTC/USDT"] == 0.0
+
+
+def test_aggregate_backtest_only_runs_fear_greed(monkeypatch):
+    seen = []
+
+    def fg(s, c, backtest=False, ts_ms=None):
+        seen.append(("fear_greed", backtest))
+        return {x: 0.5 for x in s}
+
+    def others(s, c, backtest=False, ts_ms=None):
+        seen.append(("other", backtest))
+        return {}                          # adapters self-disable when backtest=True
+
+    monkeypatch.setitem(sentiment.SOURCES, "fear_greed", fg)
+    for name in ("cryptopanic", "reddit", "x_twitter"):
+        monkeypatch.setitem(sentiment.SOURCES, name, others)
+    out = sentiment.aggregate_sentiment(["BTC/USDT"], _cfg(), backtest=True, ts_ms=1)
+    assert out["BTC/USDT"] == 0.5
+    assert ("fear_greed", True) in seen      # fear_greed called in backtest mode
+
+
+def test_aggregate_caches_within_ttl(monkeypatch):
+    calls = {"n": 0}
+
+    def fake(s, c, backtest=False, ts_ms=None):
+        calls["n"] += 1
+        return {x: 0.4 for x in s}
+
+    monkeypatch.setitem(sentiment.SOURCES, "fear_greed", fake)
+    cfg = _cfg(weights={"fear_greed": 1.0})   # only fear_greed weighted
+    sentiment.aggregate_sentiment(["BTC/USDT"], cfg)
+    sentiment.aggregate_sentiment(["BTC/USDT"], cfg)
+    assert calls["n"] == 1                     # second call served from cache

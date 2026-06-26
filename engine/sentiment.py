@@ -202,3 +202,47 @@ def x_twitter(symbols, cfg, backtest=False, ts_ms=None):
 
 SOURCES = {"fear_greed": fear_greed, "cryptopanic": cryptopanic,
            "reddit": reddit, "x_twitter": x_twitter}
+
+
+# ---- Aggregator + TTL Cache ----
+
+def _cache_get(key, ttl):
+    hit = _CACHE.get(key)
+    if hit and (time.time() - hit[0]) < ttl:
+        return hit[1]
+    return None
+
+
+def _cache_put(key, value):
+    _CACHE[key] = (time.time(), value)
+
+
+def _source_scores(name, fn, symbols, cfg, backtest, ts_ms):
+    if backtest:
+        return fn(symbols, cfg, backtest=True, ts_ms=ts_ms)   # history-backed, no live cache
+    ttl = cfg.sentiment.cache_ttl.get(name, 3600)
+    key = (name, tuple(symbols))
+    cached = _cache_get(key, ttl)
+    if cached is not None:
+        return cached
+    val = fn(symbols, cfg, backtest=False)
+    _cache_put(key, val)
+    return val
+
+
+def aggregate_sentiment(symbols, cfg, backtest=False, ts_ms=None):
+    weights = cfg.sentiment.weights
+    contrib = {s: [] for s in symbols}      # {sym: [(weight, score), ...]}
+    for name, fn in SOURCES.items():
+        w = weights.get(name, 0.0)
+        if w <= 0:
+            continue
+        for sym, score in _source_scores(name, fn, symbols, cfg, backtest, ts_ms).items():
+            if sym in contrib:
+                contrib[sym].append((w, score))
+    out = {}
+    for sym in symbols:
+        items = contrib[sym]
+        tw = sum(w for w, _ in items)
+        out[sym] = _clamp(sum(w * sc for w, sc in items) / tw) if tw else 0.0
+    return out
