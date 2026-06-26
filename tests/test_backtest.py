@@ -61,6 +61,26 @@ def test_warmup_skips_until_min_rows(tmp_path):
     assert len(r["equity_curve"]) == 2  # [capital] + 1 traded bar
 
 
+def test_stop_loss_triggers_forced_sell(tmp_path):
+    cfg = _cfg(tmp_path, ["BTC/USDT"])
+    # 50 rising candles (closes 100..149) satisfy warmup; crash candle (close 1.0)
+    # is far below the stop (~141.55) set after the first buy fill.
+    candles = _candles(50)  # ts 0..49*TF_MS, closes 100..149
+    candles.append([50 * TF_MS, 2.0, 2.0, 0.5, 1.0, 5.0])
+    feed = _feed_for({"BTC/USDT": candles})
+    r = backtest.run_backtest(
+        ["BTC/USDT"], "1h", 0, 51 * TF_MS, "indicator_rule", cfg,
+        feed=feed, strategy=_always(Decision(action="buy", size=0.5)),
+    )
+    sides = [t.side for t in r["trades"]]
+    # Strategy never emits sell → any sell fill proves the stop-loss branch ran
+    assert "sell" in sides, "stop-loss branch did not produce a sell fill"
+    assert sides[0] == "buy"
+    assert sides[-1] == "sell"
+    # Crash price (1.0) << entry (~149) → equity is well below starting capital
+    assert r["equity_curve"][-1] < 10000.0
+
+
 def test_two_symbol_timeline_is_intersection(tmp_path):
     cfg = _cfg(tmp_path, ["BTC/USDT", "ETH/USDT"])
     # BTC has 60 candles ts 0..59; ETH has 60 candles ts 1..60 -> intersection 1..59 (59 ts)
