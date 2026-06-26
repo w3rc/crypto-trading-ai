@@ -38,8 +38,9 @@ python -m engine.backtest --symbols BTC/USDT,ETH/USDT --timeframe 1h \
   --since 2024-01-01 --strategy indicator_rule
 ```
 
-Historical candles are fetched once from the exchange and cached under
-`data/cache/`. The equity + buy-hold curves are written to
+Historical candles are cached under `data/cache/` and reused on later runs
+over the same (or a contained) window; an open-ended run (no `--until`)
+refetches once newer candles have closed. The equity + buy-hold curves are written to
 `data/backtest_equity.csv`. Defaults (fees, slippage, risk, capital) come from
 `engine/config.yaml`.
 

@@ -21,8 +21,15 @@ def _write_cache(path, df):
     df.to_csv(path, index=False)
 
 
-def _covers(df, since_ms, until_ms):
-    return not df.empty and df["ts"].min() <= since_ms and df["ts"].max() >= until_ms
+def _covers(df, since_ms, until_ms, tf_ms):
+    # ponytail: "within one bar of the requested end" counts as covered —
+    # no candle newer than the last closed one can exist, so an open-ended
+    # until=now still hits the cache until a new bar closes. Ceiling: an
+    # exchange that omits the still-forming candle can refetch on a back-to-
+    # back run; upgrade path is snapping until to a bar boundary + gap-only fetch.
+    return (not df.empty
+            and df["ts"].min() <= since_ms
+            and df["ts"].max() >= until_ms - tf_ms)
 
 
 def _fetch_range(exchange, symbol, timeframe, since_ms, until_ms, limit=1000):
@@ -50,7 +57,8 @@ def load_ohlcv(exchange, symbol, timeframe, since_ms, until_ms, cache_dir="data/
     exchange_name = getattr(exchange, "id", "exchange")
     path = _cache_path(cache_dir, exchange_name, symbol, timeframe)
     cached = _read_cache(path)
-    if not _covers(cached, since_ms, until_ms):
+    tf_ms = exchange.parse_timeframe(timeframe) * 1000
+    if not _covers(cached, since_ms, until_ms, tf_ms):
         # ponytail: re-fetches the whole requested range on a partial-coverage
         # miss, not just the gap; gap-only fetch is the upgrade path.
         fetched = _fetch_range(exchange, symbol, timeframe, since_ms, until_ms)

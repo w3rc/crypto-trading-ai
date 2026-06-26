@@ -52,6 +52,21 @@ def test_load_ohlcv_slices_to_range(tmp_path):
     assert list(df["ts"]) == [TF_MS, 2 * TF_MS, 3 * TF_MS]  # only the requested window
 
 
+def test_load_ohlcv_cache_hit_within_one_bar(tmp_path):
+    """Cache covering ts 0..4*TF_MS must serve a request ending at 5*TF_MS-1 without fetching."""
+    ex = FakeExchange(_candles(5))  # candles at 0, TF_MS, 2*TF_MS, 3*TF_MS, 4*TF_MS
+    cache = str(tmp_path / "cache")
+    # prime the cache
+    path = datafeed._cache_path(cache, "fake", "BTC/USDT", "1h")
+    import os
+    os.makedirs(cache, exist_ok=True)
+    pd.DataFrame(_candles(5), columns=COLS).to_csv(path, index=False)
+    # request end is within one bar of the cache max — must hit, no fetch
+    df = datafeed.load_ohlcv(ex, "BTC/USDT", "1h", 0, 5 * TF_MS - 1, cache_dir=cache)
+    assert ex.calls == 0, "expected cache hit but exchange was called"
+    assert list(df["ts"]) == [i * TF_MS for i in range(5)]
+
+
 def test_merge_dedupes_and_sorts(tmp_path):
     ex = FakeExchange(_candles(5))
     cache = str(tmp_path / "cache")
