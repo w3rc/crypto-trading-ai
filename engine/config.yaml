@@ -18,3 +18,10 @@ rules:
   rsi_buy: 30
   rsi_sell: 70
   buy_size: 0.5
+sentiment:
+  enabled: true
+  weights: {fear_greed: 1.0, cryptopanic: 1.0, reddit: 1.0, x_twitter: 1.0}
+  cache_ttl: {fear_greed: 86400, cryptopanic: 3600, reddit: 3600, x_twitter: 3600}
+  buy_min: -0.2
+  sell_max: -0.5
+  http_timeout: 6
