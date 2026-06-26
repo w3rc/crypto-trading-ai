@@ -187,3 +187,16 @@ def test_aggregate_caches_within_ttl(monkeypatch):
     sentiment.aggregate_sentiment(["BTC/USDT"], cfg)
     sentiment.aggregate_sentiment(["BTC/USDT"], cfg)
     assert calls["n"] == 1                     # second call served from cache
+
+
+def test_aggregate_survives_a_raising_source(monkeypatch):
+    def boom(symbols, cfg, backtest=False, ts_ms=None):
+        raise RuntimeError("source exploded")
+    monkeypatch.setitem(sentiment.SOURCES, "cryptopanic", boom)
+    monkeypatch.setitem(sentiment.SOURCES, "fear_greed",
+                        lambda s, c, backtest=False, ts_ms=None: {x: 0.6 for x in s})
+    for name in ("reddit", "x_twitter"):
+        monkeypatch.setitem(sentiment.SOURCES, name,
+                            lambda s, c, backtest=False, ts_ms=None: {})
+    out = sentiment.aggregate_sentiment(["BTC/USDT"], _cfg())   # must NOT raise
+    assert out["BTC/USDT"] == pytest.approx(0.6)                # the good source still counts

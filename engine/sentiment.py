@@ -208,7 +208,7 @@ SOURCES = {"fear_greed": fear_greed, "cryptopanic": cryptopanic,
 
 def _cache_get(key, ttl):
     hit = _CACHE.get(key)
-    if hit and (time.time() - hit[0]) < ttl:
+    if hit is not None and (time.time() - hit[0]) < ttl:
         return hit[1]
     return None
 
@@ -237,9 +237,13 @@ def aggregate_sentiment(symbols, cfg, backtest=False, ts_ms=None):
         w = weights.get(name, 0.0)
         if w <= 0:
             continue
-        for sym, score in _source_scores(name, fn, symbols, cfg, backtest, ts_ms).items():
-            if sym in contrib:
-                contrib[sym].append((w, score))
+        try:
+            scores = _source_scores(name, fn, symbols, cfg, backtest, ts_ms)
+            for sym, score in scores.items():
+                if sym in contrib:
+                    contrib[sym].append((w, score))
+        except Exception:
+            continue   # a source that blows up just drops out; aggregator never raises
     out = {}
     for sym in symbols:
         items = contrib[sym]
