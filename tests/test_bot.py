@@ -170,3 +170,17 @@ def test_allow_short_resolves_from_exchange(tmp_path, monkeypatch):
     bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="sell", size=1.0)))
     st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st.positions["BTC/USDT"].qty < 0          # auto-resolved to short-enabled
+
+
+def test_short_stop_loss_covers_with_buy(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.risk.allow_short = True
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    # seed a SHORT (qty<0) whose stop (155) sits BELOW the current price (159):
+    # price has risen past the short stop -> the bot must cover with a BUY.
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=-1.0, avg_price=150.0, stop_price=155.0)
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path))
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.positions["BTC/USDT"].qty == 0.0   # covered to flat via a buy-to-close
