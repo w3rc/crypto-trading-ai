@@ -2,6 +2,16 @@ import ccxt
 import pandas as pd
 
 
+_DERIVATIVE_TYPES = {"swap", "future", "margin", "delivery"}
+
+
+def supports_short(exchange) -> bool:
+    """Whether the exchange's default market type permits shorting (offline)."""
+    # ponytail: defaultType heuristic; the precise check is load_markets + market.type.
+    options = getattr(exchange, "options", {}) or {}
+    return options.get("defaultType", "spot") in _DERIVATIVE_TYPES
+
+
 def make_exchange(name: str):
     return getattr(ccxt, name)({"enableRateLimit": True})
 
