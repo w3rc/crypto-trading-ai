@@ -6,6 +6,7 @@ data/state.json
 data/trades.csv
 data/decisions.jsonl
 data/bot.lock
+data/sentiment.json
 data/cache/
 data/backtest_equity.csv
 .pytest_cache/

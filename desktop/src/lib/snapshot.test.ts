@@ -28,3 +28,20 @@ test("readSnapshot tolerates a totally empty data dir", async () => {
   expect(snap.decisions).toEqual([]);
   rmSync(dir, { recursive: true, force: true });
 });
+
+test("readSnapshot reads sentiment.json, null when absent", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "snap-sent-"));
+  writeFileSync(join(dir, "sentiment.json"), JSON.stringify({
+    ts: "t1", strategy: "sentiment_rule",
+    symbols: { "BTC/USDT": { blended: 0.2,
+      sources: { fear_greed: 0.2, cryptopanic: null, reddit: null, x_twitter: null } } },
+  }));
+  const snap = await readSnapshot(dir);
+  expect(snap.sentiment?.strategy).toBe("sentiment_rule");
+  expect(snap.sentiment?.symbols["BTC/USDT"].blended).toBe(0.2);
+  rmSync(dir, { recursive: true, force: true });
+
+  const empty = mkdtempSync(join(tmpdir(), "snap-nosent-"));
+  expect((await readSnapshot(empty)).sentiment).toBeNull();   // missing file -> null
+  rmSync(empty, { recursive: true, force: true });
+});

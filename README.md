@@ -55,6 +55,11 @@ symbol, fed into both the LLM brain (it appears in the prompt) and the determini
 `sentiment_rule` strategy (which gates the indicator signals — it won't buy into
 strong negativity and exits on extreme negativity).
 
+The desktop dashboard shows a **Sentiment** panel — per symbol it renders the blended
+score (Fear/Greed label + gauge), the per-source breakdown (`F&G` / `news` / `reddit` /
+`X`, with `—` for sources without a key), and the active strategy. It reads
+`data/sentiment.json`, which the bot writes each cycle.
+
 Sources (each fail-safe — a missing key or dead API just drops that source):
 
 | source | signal | key (`.env`) | backtestable |

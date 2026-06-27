@@ -43,3 +43,19 @@ def test_equity_uses_avg_price_when_missing(tmp_path):
     st.positions["BTC/USDT"] = Position("BTC/USDT", qty=2.0, avg_price=500.0)
     assert equity(st, {}) == 1000.0 + 2.0 * 500.0          # falls back to avg
     assert equity(st, {"BTC/USDT": 600.0}) == 1000.0 + 2.0 * 600.0
+
+def test_write_sentiment_atomic_json(tmp_path):
+    from engine.state import write_sentiment
+    import json
+    snap = {"ts": "2026-06-26T00:00:00+00:00", "strategy": "sentiment_rule",
+            "symbols": {"BTC/USDT": {"blended": -0.62,
+                                     "sources": {"fear_greed": -0.78, "cryptopanic": None,
+                                                 "reddit": None, "x_twitter": None}}}}
+    write_sentiment(snap, str(tmp_path))
+    path = tmp_path / "sentiment.json"
+    assert path.exists()
+    loaded = json.loads(path.read_text())
+    assert loaded["strategy"] == "sentiment_rule"
+    assert loaded["symbols"]["BTC/USDT"]["blended"] == -0.62
+    assert loaded["symbols"]["BTC/USDT"]["sources"]["cryptopanic"] is None
+    assert not (tmp_path / "sentiment.json.tmp").exists()   # temp cleaned up (atomic replace)

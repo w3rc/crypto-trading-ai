@@ -102,8 +102,8 @@ def test_hold_decision_is_logged_not_executed(tmp_path):
 def test_sentiment_injected_into_features(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path)
     cfg.sentiment = SentimentConfig(enabled=True)
-    monkeypatch.setattr(bot.sentiment_mod, "aggregate_sentiment",
-                        lambda symbols, c: {"BTC/USDT": 0.42})
+    monkeypatch.setattr(bot.sentiment_mod, "breakdown",
+                        lambda symbols, c: {"BTC/USDT": {"blended": 0.42, "sources": {}}})
     seen = {}
 
     def capture(features, position, cash, c):
@@ -117,8 +117,7 @@ def test_sentiment_injected_into_features(tmp_path, monkeypatch):
 def test_sentiment_absent_symbol_is_neutral(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path)
     cfg.sentiment = SentimentConfig(enabled=True)
-    monkeypatch.setattr(bot.sentiment_mod, "aggregate_sentiment",
-                        lambda symbols, c: {})          # nothing reported
+    monkeypatch.setattr(bot.sentiment_mod, "breakdown", lambda symbols, c: {})
     seen = {}
 
     def capture(features, position, cash, c):
@@ -126,4 +125,22 @@ def test_sentiment_absent_symbol_is_neutral(tmp_path, monkeypatch):
         return Decision(action="hold")
 
     bot.run_once(cfg, market=FakeMarket(), strategy=capture)
-    assert seen["sentiment"] == 0.0                     # default neutral
+    assert seen["sentiment"] == 0.0
+
+
+def test_sentiment_snapshot_written(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    cfg.sentiment = SentimentConfig(enabled=True)
+    monkeypatch.setattr(bot.sentiment_mod, "breakdown",
+                        lambda symbols, c: {"BTC/USDT": {"blended": -0.3,
+                                                         "sources": {"fear_greed": -0.3}}})
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
+    data = _json.loads((tmp_path / "sentiment.json").read_text())
+    assert data["symbols"]["BTC/USDT"]["blended"] == -0.3
+    assert "strategy" in data and "ts" in data
+
+
+def test_sentiment_disabled_writes_no_file(tmp_path):
+    cfg = _cfg(tmp_path)   # enabled=False by default in _cfg
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
+    assert not (tmp_path / "sentiment.json").exists()
