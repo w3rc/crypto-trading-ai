@@ -58,12 +58,15 @@ def test_buy_then_sell_roundtrip_profit_minus_costs():
     assert pos3.qty == 0.0 and pos3.avg_price == 0.0   # flat after full exit
     assert 1000.0 < cash3 < 1010.0                     # profit on +10 move, minus costs
 
-def test_buy_exceeding_cash_asserts():
+def test_buy_clamped_to_cash_no_crash():
     from engine.broker import apply_fill
     from engine.models import Order
-    with pytest.raises(AssertionError):
-        apply_fill(Order("buy", 100.0, 100.0), Position("BTC/USDT"), 50.0,
-                   0.001, 0.0005, 0.05, "t")
+    # buying 100 @ 100 with only 50 cash: fills only what cash affords, never asserts
+    pos2, cash2, fill = apply_fill(Order("buy", 100.0, 100.0), Position("BTC/USDT"), 50.0,
+                                   0.001, 0.0005, 0.05, "t")
+    assert fill.qty < 100.0                  # partial fill, clamped
+    assert cash2 >= -1e-6                     # never overspent
+    assert pos2.qty == pytest.approx(fill.qty)
 
 def test_sell_beyond_long_flips_to_short():
     from engine.broker import apply_fill
@@ -173,3 +176,15 @@ def test_sell_when_flat_is_none_without_allow_short():
     # the existing long-only behavior still holds when allow_short is off (default None)
     assert plan_order(Decision(action="sell", size=1.0),
                       Position("BTC/USDT"), cash=0, price=10, equity=1000, risk=RISK) is None
+
+
+def test_cover_clamped_when_cash_short_no_crash():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    # short 1 @ 100, but only 50 cash and price gapped to 200 -> cover costs ~200 > cash.
+    # must partial-cover (no AssertionError, no negative cash), leaving a residual short.
+    pos = Position("BTC/USDT", qty=-1.0, avg_price=100.0, stop_price=105.0)
+    pos2, cash2, fill = apply_fill(Order("buy", 1.0, 200.0), pos, 50.0, 0.0, 0.0, 0.05, "t")
+    assert fill.qty < 1.0                      # only a partial cover was affordable
+    assert -1.0 < pos2.qty < 0.0               # still short, but smaller
+    assert cash2 >= -1e-6                       # never overspent

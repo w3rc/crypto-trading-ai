@@ -59,32 +59,36 @@ def _stop_price(avg: float, qty: float, stop_loss_pct: float) -> float:
 def apply_fill(order: Order, position: Position, cash: float, fee_pct: float,
                slippage_pct: float, stop_loss_pct: float, ts: str):
     """Simulate a fill on a signed position: returns (new_position, new_cash, fill)."""
-    eff = order.price * (1 + slippage_pct) if order.side == "buy" else order.price * (1 - slippage_pct)
-    notional = order.qty * eff
-    fee = notional * fee_pct
     if order.side == "buy":
-        spend = notional + fee
-        assert spend <= cash + _EPS, "buy exceeds cash (risk gate failed)"
-        new_cash = cash - spend
-        new_qty = position.qty + order.qty
+        eff = order.price * (1 + slippage_pct)
+        # ponytail: a long buy is cash-clamped by the gate; a cover / stop-close buy
+        # is NOT (no leverage model yet), so clamp here -> a forced PARTIAL cover
+        # instead of overspending or crashing. Full forced-close is liquidation (slice 2).
+        affordable = cash / (eff * (1 + fee_pct)) if eff > 0 else 0.0
+        filled = min(order.qty, max(0.0, affordable))
+        notional = filled * eff
+        fee = notional * fee_pct
+        new_cash = cash - (notional + fee)
+        new_qty = position.qty + filled
     else:                                             # sell
+        eff = order.price * (1 - slippage_pct)
+        filled = order.qty
+        notional = filled * eff
+        fee = notional * fee_pct
         new_cash = cash + (notional - fee)
-        new_qty = position.qty - order.qty
+        new_qty = position.qty - filled
 
     old_qty = position.qty
     if abs(new_qty) <= _EPS:                          # closed to flat
         new_pos = Position(position.symbol, 0.0, 0.0, 0.0)
     elif old_qty == 0 or ((old_qty > 0) == (new_qty > 0) and abs(new_qty) > abs(old_qty)):
-        # opening or extending the same direction -> weighted-average entry
-        new_avg = (abs(old_qty) * position.avg_price + order.qty * eff) / abs(new_qty)
+        new_avg = (abs(old_qty) * position.avg_price + filled * eff) / abs(new_qty)
         new_pos = Position(position.symbol, new_qty, new_avg,
                            _stop_price(new_avg, new_qty, stop_loss_pct))
-    elif (old_qty > 0) != (new_qty > 0):
-        # crossed zero (flip) -> fresh position at the fill price
+    elif (old_qty > 0) != (new_qty > 0):              # crossed zero (flip)
         new_pos = Position(position.symbol, new_qty, eff,
                            _stop_price(eff, new_qty, stop_loss_pct))
-    else:
-        # reduced toward flat (same direction) -> avg/stop unchanged
+    else:                                             # reduced toward flat
         new_pos = Position(position.symbol, new_qty, position.avg_price, position.stop_price)
 
-    return new_pos, new_cash, Fill(position.symbol, order.side, order.qty, eff, fee, ts)
+    return new_pos, new_cash, Fill(position.symbol, order.side, filled, eff, fee, ts)
