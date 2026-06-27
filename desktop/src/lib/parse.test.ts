@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { parseTradesCsv, parseDecisions } from "./parse";
+import { parseTradesCsv, parseDecisions, parseSentiment } from "./parse";
 
 test("parseTradesCsv parses header + rows, coerces numbers", () => {
   const csv = "ts,symbol,side,qty,price,fee\nt1,BTC/USDT,buy,0.5,60000,0.3\nt2,BTC/USDT,sell,0.5,61000,0.305\n";
@@ -24,4 +24,17 @@ test("parseDecisions parses jsonl, skips blank lines", () => {
 
 test("parseDecisions tolerates empty input", () => {
   expect(parseDecisions("")).toEqual([]);
+});
+
+test("parseSentiment round-trips a snapshot", () => {
+  const json = JSON.stringify({
+    ts: "2026-06-26T00:00:00+00:00", strategy: "sentiment_rule",
+    symbols: { "BTC/USDT": { blended: -0.62,
+      sources: { fear_greed: -0.78, cryptopanic: null, reddit: null, x_twitter: null } } },
+  });
+  const s = parseSentiment(json);
+  expect(s.strategy).toBe("sentiment_rule");
+  expect(s.symbols["BTC/USDT"].blended).toBe(-0.62);
+  expect(s.symbols["BTC/USDT"].sources.fear_greed).toBe(-0.78);
+  expect(s.symbols["BTC/USDT"].sources.reddit).toBeNull();
 });
