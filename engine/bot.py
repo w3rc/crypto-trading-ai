@@ -22,8 +22,8 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
         exchange = market.make_exchange(cfg.exchange)
         prices: dict[str, float] = {}
         ts = _now()
-        sent = (sentiment_mod.aggregate_sentiment(cfg.symbols, cfg)
-                if cfg.sentiment.enabled else {})
+        bd = (sentiment_mod.breakdown(cfg.symbols, cfg)
+              if cfg.sentiment.enabled else {})
 
         for sym in cfg.symbols:
             try:
@@ -38,7 +38,7 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
                 continue
 
             feats["price"] = price          # fill/stop use the live ticker, not the stale candle close
-            feats["sentiment"] = sent.get(sym, 0.0)
+            feats["sentiment"] = bd.get(sym, {}).get("blended", 0.0)
             prices[sym] = price
             pos = st.positions[sym]
             equity = state_mod.equity(st, prices)   # best-effort equity for sizing
@@ -67,6 +67,13 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
             st.cash = new_cash
             state_mod.append_trade(fill, cfg.data_dir)
             print(f"[{sym}] {order.side.upper()} {order.qty:.6f} @ {fill.price:.2f} — {reason}")
+
+        if cfg.sentiment.enabled:
+            try:
+                state_mod.write_sentiment(
+                    {"ts": ts, "strategy": cfg.strategy, "symbols": bd}, cfg.data_dir)
+            except Exception as e:                  # advisory: a write error never aborts the cycle
+                log.warning("sentiment snapshot write failed: %s", e)
 
         if prices:
             total = state_mod.equity(st, prices)
