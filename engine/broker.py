@@ -43,31 +43,48 @@ def plan_order(decision: Decision, position: Position, cash: float,
 
 
 def stop_triggered(position: Position, price: float) -> bool:
-    return position.qty > 0 and position.stop_price > 0 and price <= position.stop_price
+    if position.stop_price <= 0:
+        return False
+    if position.qty > 0:
+        return price <= position.stop_price          # long stop below entry
+    if position.qty < 0:
+        return price >= position.stop_price          # short stop above entry
+    return False
+
+
+def _stop_price(avg: float, qty: float, stop_loss_pct: float) -> float:
+    return avg * (1 - stop_loss_pct) if qty > 0 else avg * (1 + stop_loss_pct)
 
 
 def apply_fill(order: Order, position: Position, cash: float, fee_pct: float,
                slippage_pct: float, stop_loss_pct: float, ts: str):
-    """Simulate a fill: returns (new_position, new_cash, fill_record)."""
-    if order.side == "buy":
-        eff = order.price * (1 + slippage_pct)
-        notional = order.qty * eff
-        fee = notional * fee_pct
-        spend = notional + fee
-        assert spend <= cash + _EPS, "buy exceeds cash (risk gate failed)"
-        new_qty = position.qty + order.qty
-        new_avg = (position.qty * position.avg_price + order.qty * eff) / new_qty
-        new_pos = Position(position.symbol, new_qty, new_avg, new_avg * (1 - stop_loss_pct))
-        return new_pos, cash - spend, Fill(position.symbol, "buy", order.qty, eff, fee, ts)
-
-    # sell
-    assert order.qty <= position.qty + _EPS, "sell exceeds holdings (risk gate failed)"
-    eff = order.price * (1 - slippage_pct)
+    """Simulate a fill on a signed position: returns (new_position, new_cash, fill)."""
+    eff = order.price * (1 + slippage_pct) if order.side == "buy" else order.price * (1 - slippage_pct)
     notional = order.qty * eff
     fee = notional * fee_pct
-    new_qty = position.qty - order.qty
-    if new_qty <= _EPS:
+    if order.side == "buy":
+        spend = notional + fee
+        assert spend <= cash + _EPS, "buy exceeds cash (risk gate failed)"
+        new_cash = cash - spend
+        new_qty = position.qty + order.qty
+    else:                                             # sell
+        new_cash = cash + (notional - fee)
+        new_qty = position.qty - order.qty
+
+    old_qty = position.qty
+    if abs(new_qty) <= _EPS:                          # closed to flat
         new_pos = Position(position.symbol, 0.0, 0.0, 0.0)
+    elif old_qty == 0 or ((old_qty > 0) == (new_qty > 0) and abs(new_qty) > abs(old_qty)):
+        # opening or extending the same direction -> weighted-average entry
+        new_avg = (abs(old_qty) * position.avg_price + order.qty * eff) / abs(new_qty)
+        new_pos = Position(position.symbol, new_qty, new_avg,
+                           _stop_price(new_avg, new_qty, stop_loss_pct))
+    elif (old_qty > 0) != (new_qty > 0):
+        # crossed zero (flip) -> fresh position at the fill price
+        new_pos = Position(position.symbol, new_qty, eff,
+                           _stop_price(eff, new_qty, stop_loss_pct))
     else:
+        # reduced toward flat (same direction) -> avg/stop unchanged
         new_pos = Position(position.symbol, new_qty, position.avg_price, position.stop_price)
-    return new_pos, cash + (notional - fee), Fill(position.symbol, "sell", order.qty, eff, fee, ts)
+
+    return new_pos, new_cash, Fill(position.symbol, order.side, order.qty, eff, fee, ts)

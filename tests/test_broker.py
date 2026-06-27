@@ -65,12 +65,60 @@ def test_buy_exceeding_cash_asserts():
         apply_fill(Order("buy", 100.0, 100.0), Position("BTC/USDT"), 50.0,
                    0.001, 0.0005, 0.05, "t")
 
-def test_sell_exceeding_holdings_asserts():
+def test_sell_beyond_long_flips_to_short():
     from engine.broker import apply_fill
     from engine.models import Order
-    with pytest.raises(AssertionError):
-        apply_fill(Order("sell", 5.0, 100.0), Position("BTC/USDT", qty=1.0),
-                   0.0, 0.001, 0.0005, 0.05, "t")
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0)
+    pos2, cash2, _ = apply_fill(Order("sell", 5.0, 100.0), pos, 0.0, 0.0, 0.0, 0.05, "t")
+    assert pos2.qty == pytest.approx(-4.0)             # 1 long - 5 sold = 4 short
+    assert pos2.avg_price == pytest.approx(100.0)      # new short entry = fill price
+    assert pos2.stop_price == pytest.approx(105.0)     # short stop above entry
+
+
+def test_open_short_sets_negative_qty_and_stop_above():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    pos2, cash2, _ = apply_fill(Order("sell", 2.0, 100.0), Position("BTC/USDT"), 1000.0,
+                                0.0, 0.0, 0.05, "t")
+    assert pos2.qty == pytest.approx(-2.0)
+    assert pos2.avg_price == pytest.approx(100.0)
+    assert pos2.stop_price == pytest.approx(105.0)     # 100*(1+0.05)
+    assert cash2 == pytest.approx(1200.0)              # received 2*100 proceeds
+
+
+def test_extend_short_weighted_avg():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    pos = Position("BTC/USDT", qty=-2.0, avg_price=100.0, stop_price=105.0)
+    pos2, _, _ = apply_fill(Order("sell", 1.0, 130.0), pos, 1000.0, 0.0, 0.0, 0.05, "t")
+    assert pos2.qty == pytest.approx(-3.0)
+    assert pos2.avg_price == pytest.approx((2 * 100 + 1 * 130) / 3)   # 110
+
+
+def test_cover_partial_preserves_avg():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    pos = Position("BTC/USDT", qty=-10.0, avg_price=100.0, stop_price=105.0)
+    pos2, cash2, _ = apply_fill(Order("buy", 4.0, 90.0), pos, 2000.0, 0.0, 0.0, 0.05, "t")
+    assert pos2.qty == pytest.approx(-6.0)
+    assert pos2.avg_price == pytest.approx(100.0)      # cost basis unchanged on partial cover
+    assert pos2.stop_price == pytest.approx(105.0)
+
+
+def test_short_profit_when_price_falls():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    # open short at 100, cover at 90 -> profit
+    pos2, cash2, _ = apply_fill(Order("sell", 1.0, 100.0), Position("BTC/USDT"), 1000.0, 0.0, 0.0, 0.05, "t")
+    pos3, cash3, _ = apply_fill(Order("buy", 1.0, 90.0), pos2, cash2, 0.0, 0.0, 0.05, "t2")
+    assert pos3.qty == 0.0                              # flat
+    assert cash3 == pytest.approx(1010.0)              # +100 -90 = +10 profit
+
+
+def test_short_stop_fires_above_entry():
+    pos = Position("BTC/USDT", qty=-1.0, avg_price=100.0, stop_price=105.0)
+    assert stop_triggered(pos, 106) is True            # price rose past the short stop
+    assert stop_triggered(pos, 104) is False
 
 def test_buy_into_existing_position_weighted_avg_and_stop():
     from engine.broker import apply_fill
