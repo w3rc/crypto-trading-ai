@@ -5,8 +5,8 @@ const SOURCE_ROWS: [keyof SourceScores, string][] = [
   ["fear_greed", "F&G"], ["cryptopanic", "news"], ["reddit", "reddit"], ["x_twitter", "X"],
 ];
 
-function fmt(v: number | null): string {
-  return v === null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2);
+function fmt(v: number | null | undefined): string {
+  return v == null ? "—" : (v >= 0 ? "+" : "") + v.toFixed(2);
 }
 
 function color(score: number): string {
@@ -15,7 +15,7 @@ function color(score: number): string {
 
 export default function SentimentPanel({ sentiment }: { sentiment: SentimentSnapshot | null }) {
   if (!sentiment) return <div className="empty">Sentiment off.</div>;
-  const syms = Object.entries(sentiment.symbols);
+  const syms = Object.entries(sentiment.symbols ?? {});
   if (!syms.length) return <div className="empty">No sentiment yet.</div>;
   return (
     <div>
