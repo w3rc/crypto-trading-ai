@@ -3,6 +3,7 @@ import type { Snapshot } from "../../lib/parse";
 import EquityChart from "./components/EquityChart";
 import PositionsTable from "./components/PositionsTable";
 import DecisionLog from "./components/DecisionLog";
+import SentimentPanel from "./components/SentimentPanel";
 
 const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null };
 const api = (window as unknown as { api: { getSnapshot: () => Promise<Snapshot> } }).api;
@@ -63,6 +64,11 @@ export default function App(): React.JSX.Element {
         <div className="card">
           <h2>Decisions <span className="muted" style={{ textTransform: "none", letterSpacing: 0 }}>(* = not executed)</span></h2>
           <DecisionLog decisions={snap.decisions} />
+        </div>
+
+        <div className="card span2">
+          <h2>Sentiment</h2>
+          <SentimentPanel sentiment={snap.sentiment} />
         </div>
       </div>
     </main>
