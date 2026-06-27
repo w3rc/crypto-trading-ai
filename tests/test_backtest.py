@@ -150,3 +150,13 @@ def test_main_warns_on_non_deterministic_strategy(monkeypatch, tmp_path, capsys)
     backtest.main(["--since", "2024-01-01", "--symbols", "BTC/USDT",
                    "--strategy", "hybrid", "--out", str(tmp_path / "eq.csv")])
     assert "WARNING" in capsys.readouterr().out   # LLM cost warning
+
+
+def test_backtest_can_short_when_allow_short(tmp_path):
+    cfg = _cfg(tmp_path, ["BTC/USDT"])
+    cfg.risk.allow_short = True
+    feed = _feed_for({"BTC/USDT": _candles(60)})
+    r = backtest.run_backtest(["BTC/USDT"], "1h", 0, 60 * TF_MS, "indicator_rule", cfg,
+                              feed=feed, strategy=_always(Decision(action="sell", size=1.0)))
+    assert any(t.side == "sell" for t in r["trades"])   # opened shorts
+    assert len(r["equity_curve"]) == len(r["buy_hold_curve"])

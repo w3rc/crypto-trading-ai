@@ -144,3 +144,29 @@ def test_sentiment_disabled_writes_no_file(tmp_path):
     cfg = _cfg(tmp_path)   # enabled=False by default in _cfg
     bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
     assert not (tmp_path / "sentiment.json").exists()
+
+
+def test_short_opens_when_allow_short(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.risk.allow_short = True
+    # a flat position + a bearish "sell" strategy -> opens a short
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="sell", size=1.0)))
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st.positions["BTC/USDT"].qty < 0          # now short
+
+
+def test_no_short_when_allow_short_off(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.risk.allow_short = False
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="sell", size=1.0)))
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st.positions["BTC/USDT"].qty == 0.0       # flat sell nullified (spot long-only)
+
+
+def test_allow_short_resolves_from_exchange(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    cfg.risk.allow_short = None                       # auto
+    monkeypatch.setattr(bot.market_mod, "supports_short", lambda ex: True)
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="sell", size=1.0)))
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st.positions["BTC/USDT"].qty < 0          # auto-resolved to short-enabled
