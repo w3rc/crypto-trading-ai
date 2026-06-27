@@ -77,6 +77,13 @@ component (the others have no clean history):
 python -m engine.backtest --since 2024-01-01 --strategy sentiment_rule
 ```
 
+## Shorting
+
+Set `risk.allow_short: true` (or point at a derivatives exchange, where it auto-enables) to
+let the bot hold **short** positions: a `sell` from flat opens a short (`qty < 0`), a `buy`
+covers it, and the stop-loss works both directions. Capped by `max_position_pct` like longs;
+no leverage yet. The dashboard's positions table shows a **Side** (Long/Short) column.
+
 ## Tests
 ```bash
 python -m pytest -q

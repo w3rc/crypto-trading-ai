@@ -15,3 +15,21 @@ def test_fetch_ohlcv_df_shape():
 
 def test_fetch_price():
     assert fetch_price(FakeExchange(), "BTC/USDT") == 123.45
+
+
+from types import SimpleNamespace
+from engine import market
+
+
+def test_supports_short_spot_is_false():
+    assert market.supports_short(SimpleNamespace(options={"defaultType": "spot"})) is False
+
+
+def test_supports_short_swap_is_true():
+    assert market.supports_short(SimpleNamespace(options={"defaultType": "swap"})) is True
+    assert market.supports_short(SimpleNamespace(options={"defaultType": "future"})) is True
+
+
+def test_supports_short_unknown_or_none_is_false():
+    assert market.supports_short(SimpleNamespace()) is False   # no .options
+    assert market.supports_short(None) is False

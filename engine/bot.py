@@ -20,6 +20,8 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
     with state_mod.acquire_lock(cfg.data_dir):
         st = state_mod.load_state(cfg.data_dir, cfg.paper_capital, cfg.symbols)
         exchange = market.make_exchange(cfg.exchange)
+        if cfg.risk.allow_short is None:
+            cfg.risk.allow_short = market_mod.supports_short(exchange)
         prices: dict[str, float] = {}
         ts = _now()
         bd = (sentiment_mod.breakdown(cfg.symbols, cfg)
@@ -39,12 +41,14 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
 
             feats["price"] = price          # fill/stop use the live ticker, not the stale candle close
             feats["sentiment"] = bd.get(sym, {}).get("blended", 0.0)
+            feats["allow_short"] = bool(cfg.risk.allow_short)
             prices[sym] = price
             pos = st.positions[sym]
             equity = state_mod.equity(st, prices)   # best-effort equity for sizing
 
             if broker.stop_triggered(pos, price):
-                order, reason = Order("sell", pos.qty, price), "stop-loss"
+                close = Order("sell", pos.qty, price) if pos.qty > 0 else Order("buy", -pos.qty, price)
+                order, reason = close, "stop-loss"
             else:
                 decision = strategy(feats, pos, st.cash, cfg)
                 order = broker.plan_order(decision, pos, st.cash, price, equity, cfg.risk)

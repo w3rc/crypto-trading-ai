@@ -75,3 +75,8 @@ def test_constructed_client_uses_neutral_user_agent(monkeypatch):
     d = decide(FEATS, Position("BTC/USDT"), 10000, CFG, client=None)
     assert d.action == "hold"
     assert "OpenAI" not in captured["default_headers"]["User-Agent"]
+
+def test_system_prompt_allows_shorting_when_flagged():
+    from engine.llm import _system_prompt
+    assert "short" in _system_prompt(True).lower()
+    assert "only go long" in _system_prompt(False).lower()

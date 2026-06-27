@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass, field
+from typing import Optional
 
 import yaml
 
@@ -8,6 +9,7 @@ import yaml
 class RiskConfig:
     max_position_pct: float
     stop_loss_pct: float
+    allow_short: Optional[bool] = None
 
 
 @dataclass
@@ -76,6 +78,7 @@ def load_config(path: str = "engine/config.yaml") -> Config:
         risk=RiskConfig(
             max_position_pct=float(raw["risk"]["max_position_pct"]),
             stop_loss_pct=float(raw["risk"]["stop_loss_pct"]),
+            allow_short=raw["risk"].get("allow_short", None),
         ),
         llm=LLMConfig(
             base_url=llm["base_url"],

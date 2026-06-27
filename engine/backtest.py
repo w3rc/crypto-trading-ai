@@ -38,6 +38,8 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
     data = {sym: feed(exchange, sym, timeframe, since_ms, until_ms) for sym in symbols}
     timeline = _common_timeline(data)
     strat = strategy or strategies.get(strategy_name)
+    if cfg.risk.allow_short is None and exchange is not None:
+        cfg.risk.allow_short = market.supports_short(exchange)
 
     cash = cfg.paper_capital
     positions = {sym: Position(sym) for sym in symbols}
@@ -57,13 +59,14 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
                 if cfg.sentiment.enabled else {})
         for sym in symbols:
             feats[sym]["sentiment"] = sent.get(sym, 0.0)
+            feats[sym]["allow_short"] = bool(cfg.risk.allow_short)
 
         equity = cash + sum(positions[s].qty * prices[s] for s in symbols)
         for sym in symbols:
             pos = positions[sym]
             price = prices[sym]
             if broker.stop_triggered(pos, price):
-                order = Order("sell", pos.qty, price)
+                order = Order("sell", pos.qty, price) if pos.qty > 0 else Order("buy", -pos.qty, price)
             else:
                 decision = strat(feats[sym], pos, cash, cfg)
                 order = broker.plan_order(decision, pos, cash, price, equity, cfg.risk)

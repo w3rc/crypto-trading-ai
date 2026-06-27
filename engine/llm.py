@@ -2,15 +2,25 @@ import json
 
 from engine.models import Decision, Position
 
-SYSTEM_PROMPT = (
-    "You are a disciplined crypto spot trader. You may only go long or flat "
-    "(no shorting). Given indicator values and the current position, decide ONE "
-    "action. Respond with ONLY a JSON object, no prose, of the form: "
+_JSON_RULES = (
+    "Respond with ONLY a JSON object, no prose, of the form: "
     '{"action": "buy"|"sell"|"hold", "size": <0..1>, "reason": "<short>", '
-    '"stop": <price or null>}. "size" is the fraction of equity to deploy on a '
-    "buy, or the fraction of the held position to sell. Be conservative; prefer "
-    "hold when the signal is weak."
+    '"stop": <price or null>}. "size" is the fraction of equity to deploy. Be '
+    "conservative; prefer hold when the signal is weak."
 )
+
+
+def _system_prompt(allow_short: bool) -> str:
+    if allow_short:
+        return (
+            "You are a disciplined crypto trader. You may go long, short, or flat. "
+            "A 'buy' increases your position (or covers a short); a 'sell' decreases "
+            "it (or opens/extends a short). " + _JSON_RULES
+        )
+    return (
+        "You are a disciplined crypto spot trader. You may only go long or flat "
+        "(no shorting). " + _JSON_RULES
+    )
 
 
 def _build_user(features: dict, position: Position, cash: float) -> str:
@@ -51,7 +61,7 @@ def decide(features: dict, position: Position, cash: float, cfg, client=None) ->
         kwargs = dict(
             model=cfg.model,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": _system_prompt(bool(features.get("allow_short")))},
                 {"role": "user", "content": _build_user(features, position, cash)},
             ],
             temperature=0,

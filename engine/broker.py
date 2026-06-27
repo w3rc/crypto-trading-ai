@@ -5,56 +5,90 @@ _EPS = 1e-6
 
 def plan_order(decision: Decision, position: Position, cash: float,
                price: float, equity: float, risk) -> Order | None:
-    """Turn an LLM decision into a clamped, executable order (or None).
+    """Turn a decision into a clamped, executable order (or None).
 
-    The gate is authoritative: buys are capped to the per-position limit AND
-    available cash; sells are capped to held quantity. Spot long-only, so a
-    sell never exceeds holdings and a buy never exceeds the cap.
+    The gate is authoritative. Long-only by default; when risk.allow_short is
+    true a sell opens/extends a short and a buy covers one. A reducing order
+    clamps at flat (no single-order flip). |qty*price| never exceeds the cap.
     """
     if price <= 0:
         return None
+    allow_short = bool(getattr(risk, "allow_short", False))   # None/False -> long-only
+    qty = position.qty
+    max_value = risk.max_position_pct * equity
+
     if decision.action == "buy":
-        max_position_value = risk.max_position_pct * equity
-        headroom = max(0.0, max_position_value - position.qty * price)
-        notional = min(decision.size * equity, headroom, cash)
-        qty = notional / price
-        if qty * price < _EPS:
+        if qty < 0:                                   # cover a short -> clamp at flat
+            q = min(decision.size * equity / price, -qty)
+        else:                                         # open/extend long
+            headroom = max(0.0, max_value - qty * price)
+            q = min(decision.size * equity, headroom, cash) / price
+        if q * price < _EPS:
             return None
-        return Order(side="buy", qty=qty, price=price)
+        return Order(side="buy", qty=q, price=price)
+
     if decision.action == "sell":
-        qty = min(decision.size * position.qty, position.qty)
-        if qty <= _EPS:
+        if qty > 0:                                   # reduce long -> clamp at flat
+            q = min(decision.size * qty, qty)
+        elif allow_short:                             # open/extend short
+            short_headroom = max(0.0, max_value - (-qty) * price)
+            q = min(decision.size * equity, short_headroom) / price
+        else:
+            return None                               # spot long-only
+        if q * price < _EPS:
             return None
-        return Order(side="sell", qty=qty, price=price)
+        return Order(side="sell", qty=q, price=price)
+
     return None
 
 
 def stop_triggered(position: Position, price: float) -> bool:
-    return position.qty > 0 and position.stop_price > 0 and price <= position.stop_price
+    if position.stop_price <= 0:
+        return False
+    if position.qty > 0:
+        return price <= position.stop_price          # long stop below entry
+    if position.qty < 0:
+        return price >= position.stop_price          # short stop above entry
+    return False
+
+
+def _stop_price(avg: float, qty: float, stop_loss_pct: float) -> float:
+    return avg * (1 - stop_loss_pct) if qty > 0 else avg * (1 + stop_loss_pct)
 
 
 def apply_fill(order: Order, position: Position, cash: float, fee_pct: float,
                slippage_pct: float, stop_loss_pct: float, ts: str):
-    """Simulate a fill: returns (new_position, new_cash, fill_record)."""
+    """Simulate a fill on a signed position: returns (new_position, new_cash, fill)."""
     if order.side == "buy":
         eff = order.price * (1 + slippage_pct)
-        notional = order.qty * eff
+        # ponytail: a long buy is cash-clamped by the gate; a cover / stop-close buy
+        # is NOT (no leverage model yet), so clamp here -> a forced PARTIAL cover
+        # instead of overspending or crashing. Full forced-close is liquidation (slice 2).
+        affordable = cash / (eff * (1 + fee_pct)) if eff > 0 else 0.0
+        filled = min(order.qty, max(0.0, affordable))
+        notional = filled * eff
         fee = notional * fee_pct
-        spend = notional + fee
-        assert spend <= cash + _EPS, "buy exceeds cash (risk gate failed)"
-        new_qty = position.qty + order.qty
-        new_avg = (position.qty * position.avg_price + order.qty * eff) / new_qty
-        new_pos = Position(position.symbol, new_qty, new_avg, new_avg * (1 - stop_loss_pct))
-        return new_pos, cash - spend, Fill(position.symbol, "buy", order.qty, eff, fee, ts)
+        new_cash = cash - (notional + fee)
+        new_qty = position.qty + filled
+    else:                                             # sell
+        eff = order.price * (1 - slippage_pct)
+        filled = order.qty
+        notional = filled * eff
+        fee = notional * fee_pct
+        new_cash = cash + (notional - fee)
+        new_qty = position.qty - filled
 
-    # sell
-    assert order.qty <= position.qty + _EPS, "sell exceeds holdings (risk gate failed)"
-    eff = order.price * (1 - slippage_pct)
-    notional = order.qty * eff
-    fee = notional * fee_pct
-    new_qty = position.qty - order.qty
-    if new_qty <= _EPS:
+    old_qty = position.qty
+    if abs(new_qty) <= _EPS:                          # closed to flat
         new_pos = Position(position.symbol, 0.0, 0.0, 0.0)
-    else:
+    elif old_qty == 0 or ((old_qty > 0) == (new_qty > 0) and abs(new_qty) > abs(old_qty)):
+        new_avg = (abs(old_qty) * position.avg_price + filled * eff) / abs(new_qty)
+        new_pos = Position(position.symbol, new_qty, new_avg,
+                           _stop_price(new_avg, new_qty, stop_loss_pct))
+    elif (old_qty > 0) != (new_qty > 0):              # crossed zero (flip)
+        new_pos = Position(position.symbol, new_qty, eff,
+                           _stop_price(eff, new_qty, stop_loss_pct))
+    else:                                             # reduced toward flat
         new_pos = Position(position.symbol, new_qty, position.avg_price, position.stop_price)
-    return new_pos, cash + (notional - fee), Fill(position.symbol, "sell", order.qty, eff, fee, ts)
+
+    return new_pos, new_cash, Fill(position.symbol, order.side, filled, eff, fee, ts)
