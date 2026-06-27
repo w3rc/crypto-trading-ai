@@ -85,10 +85,29 @@ the existing 116 tests and all live behavior are unchanged.
 - `apply_fill` sets `stop_price = avg·(1 − stop_loss_pct)` for a long, `avg·(1 + stop_loss_pct)`
   for a short.
 
-## Config (`engine/config.py`, `config.yaml`)
+## Config + auto-default from the exchange
 
-`RiskConfig` gains `allow_short: bool = False`; the `risk:` block gains `allow_short: false`.
-Off by default → opt-in.
+`RiskConfig` gains `allow_short: Optional[bool] = None` — default **auto**:
+- `None` / auto → **inferred from the configured exchange**: a derivatives/margin venue
+  defaults shorting **on**, a spot venue **off**.
+- explicit `true` / `false` in the `risk:` block overrides the inference.
+
+`market.supports_short(exchange) -> bool` does the inference **offline** (no network) via
+ccxt's default market type:
+`exchange.options.get("defaultType", "spot") in {"swap", "future", "margin", "delivery"}`.
+A `None` / non-ccxt / unknown exchange → `False` (safe).
+`# ponytail: defaultType heuristic; the precise check is load_markets + market.type.`
+
+The bot and backtest **resolve it once**, right after `make_exchange`:
+`if cfg.risk.allow_short is None: cfg.risk.allow_short = market.supports_short(exchange)`.
+The gate then reads the concrete bool — its rules above are unchanged.
+
+**Consequence (backward-compatible):** the current config (`exchange: binance`, which is ccxt
+**spot**) auto-resolves to `allow_short = False`, so existing behavior is byte-identical and the
+116-test suite is unaffected. To short, point at a derivatives exchange (e.g. `binanceusdm`) or
+set `risk.allow_short: true` — and since the engine only uses the exchange as a *data source*
+(it simulates fills), the explicit override shorts on any venue. The `risk:` block leaves
+`allow_short` unset (auto) by default.
 
 ## Brain + strategies
 
@@ -112,8 +131,9 @@ work (they use signed `qty·price`).
 - The gate stays the **single authority**: every order still flows through `plan_order` →
   `apply_fill`; the symmetric cap replaces the long-only cap; no path lets `|exposure|` exceed
   `max_position_value`.
-- **Opt-in, default off**: with `allow_short=false`, behavior is byte-identical to today
-  (the existing suite proves it).
+- **Auto-default, spot resolves off**: with `allow_short` resolving to `False` on the current
+  spot exchange, behavior is byte-identical to today (the existing suite proves it). Shorting
+  only activates on a derivatives venue or an explicit `risk.allow_short: true`.
 - Backtest inherits shorting for free (it calls the same gate).
 - Fail-safe HOLD on any error is unchanged.
 
@@ -139,12 +159,14 @@ hides truly-flat (`qty === 0`) positions.
 
 | file | change |
 |---|---|
-| `engine/config.py`, `engine/config.yaml` | `+ allow_short` (default false) |
+| `engine/config.py`, `engine/config.yaml` | `RiskConfig.allow_short: Optional[bool] = None` (auto); `risk:` block leaves it unset |
+| `engine/market.py` | `+ supports_short(exchange)` (offline `defaultType` inference) |
 | `engine/broker.py` | `plan_order` symmetric cap + short open/cover; `apply_fill` signed qty + directional stop; `stop_triggered` both ways |
+| `engine/bot.py`, `engine/backtest.py` | resolve `allow_short` from the exchange once when `None` (after `make_exchange`) |
 | `engine/llm.py` | prompt's shorting line conditional on `allow_short` |
 | `desktop/src/renderer/src/components/PositionsTable.tsx` | show shorts (`qty ≠ 0`) with a Long/Short label |
-| tests (`test_broker`, `test_bot`, `test_backtest`, desktop `PositionsTable`) | as above |
-| `README.md` | note shorting + `allow_short` |
+| tests (`test_broker`, `test_market`, `test_bot`, `test_backtest`, desktop `PositionsTable`) | as above |
+| `README.md` | note shorting + `allow_short` (auto / override) |
 
 No new dependencies. No change to `indicators`/`strategies`/`state` logic (only `state.equity`
 is reused, already signed-correct). Models: `Position`/`Order` unchanged in shape (`qty` simply
