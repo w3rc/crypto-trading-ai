@@ -91,3 +91,37 @@ def test_partial_sell_preserves_avg_and_stop():
     assert pos2.avg_price == pytest.approx(100.0)   # cost basis unchanged on partial sell
     assert pos2.stop_price == pytest.approx(95.0)   # stop preserved on partial sell
     assert cash2 == pytest.approx(440.0)            # 4 * 110, no fees/slippage
+
+
+RISK_S = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05, allow_short=True)
+
+
+def test_sell_when_flat_opens_short_capped():
+    # equity 1000 -> cap 250; sell from flat opens a short up to the cap
+    o = plan_order(Decision(action="sell", size=1.0),
+                   Position("BTC/USDT"), cash=0, price=10, equity=1000, risk=RISK_S)
+    assert o.side == "sell" and o.qty == pytest.approx(25.0)   # 250 notional / 10
+
+
+def test_sell_extends_short_up_to_cap():
+    pos = Position("BTC/USDT", qty=-10, avg_price=10, stop_price=10.5)  # short notional 100
+    o = plan_order(Decision(action="sell", size=1.0), pos, cash=0, price=10, equity=1000, risk=RISK_S)
+    assert o.qty == pytest.approx(15.0)    # remaining short headroom 250-100=150 / 10
+
+
+def test_buy_covers_short_clamped_at_flat():
+    pos = Position("BTC/USDT", qty=-10, avg_price=10, stop_price=10.5)
+    o = plan_order(Decision(action="buy", size=1.0), pos, cash=10000, price=10, equity=1000, risk=RISK_S)
+    assert o.side == "buy" and o.qty == pytest.approx(10.0)   # covers exactly to flat, no flip
+
+
+def test_buy_partial_cover_short():
+    pos = Position("BTC/USDT", qty=-10, avg_price=10, stop_price=10.5)
+    o = plan_order(Decision(action="buy", size=0.05), pos, cash=10000, price=10, equity=1000, risk=RISK_S)
+    assert o.qty == pytest.approx(5.0)     # 0.05*1000/10 = 5, below the 10 to flat
+
+
+def test_sell_when_flat_is_none_without_allow_short():
+    # the existing long-only behavior still holds when allow_short is off (default None)
+    assert plan_order(Decision(action="sell", size=1.0),
+                      Position("BTC/USDT"), cash=0, price=10, equity=1000, risk=RISK) is None

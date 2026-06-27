@@ -5,27 +5,40 @@ _EPS = 1e-6
 
 def plan_order(decision: Decision, position: Position, cash: float,
                price: float, equity: float, risk) -> Order | None:
-    """Turn an LLM decision into a clamped, executable order (or None).
+    """Turn a decision into a clamped, executable order (or None).
 
-    The gate is authoritative: buys are capped to the per-position limit AND
-    available cash; sells are capped to held quantity. Spot long-only, so a
-    sell never exceeds holdings and a buy never exceeds the cap.
+    The gate is authoritative. Long-only by default; when risk.allow_short is
+    true a sell opens/extends a short and a buy covers one. A reducing order
+    clamps at flat (no single-order flip). |qty*price| never exceeds the cap.
     """
     if price <= 0:
         return None
+    allow_short = bool(getattr(risk, "allow_short", False))   # None/False -> long-only
+    qty = position.qty
+    max_value = risk.max_position_pct * equity
+
     if decision.action == "buy":
-        max_position_value = risk.max_position_pct * equity
-        headroom = max(0.0, max_position_value - position.qty * price)
-        notional = min(decision.size * equity, headroom, cash)
-        qty = notional / price
-        if qty * price < _EPS:
+        if qty < 0:                                   # cover a short -> clamp at flat
+            q = min(decision.size * equity / price, -qty)
+        else:                                         # open/extend long
+            headroom = max(0.0, max_value - qty * price)
+            q = min(decision.size * equity, headroom, cash) / price
+        if q * price < _EPS:
             return None
-        return Order(side="buy", qty=qty, price=price)
+        return Order(side="buy", qty=q, price=price)
+
     if decision.action == "sell":
-        qty = min(decision.size * position.qty, position.qty)
-        if qty <= _EPS:
+        if qty > 0:                                   # reduce long -> clamp at flat
+            q = min(decision.size * qty, qty)
+        elif allow_short:                             # open/extend short
+            short_headroom = max(0.0, max_value - (-qty) * price)
+            q = min(decision.size * equity, short_headroom) / price
+        else:
+            return None                               # spot long-only
+        if q * price < _EPS:
             return None
-        return Order(side="sell", qty=qty, price=price)
+        return Order(side="sell", qty=q, price=price)
+
     return None
 
 
