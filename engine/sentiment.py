@@ -230,9 +230,22 @@ def _source_scores(name, fn, symbols, cfg, backtest, ts_ms):
     return val
 
 
-def aggregate_sentiment(symbols, cfg, backtest=False, ts_ms=None):
+def _blend(items):
+    """Weighted mean over present (weight, score) pairs; 0.0 if none; clamped."""
+    tw = sum(w for w, _ in items)
+    return _clamp(sum(w * sc for w, sc in items) / tw) if tw else 0.0
+
+
+def breakdown(symbols, cfg, backtest=False, ts_ms=None):
+    """Per-source scores + the weighted blend per symbol. Never raises.
+
+    Returns {sym: {"blended": float, "sources": {name: score|None}}}; a source
+    that did not contribute a score for a symbol is reported as None (distinct
+    from a real 0.0).
+    """
     weights = cfg.sentiment.weights
-    contrib = {s: [] for s in symbols}      # {sym: [(weight, score), ...]}
+    contrib = {s: [] for s in symbols}                              # {sym: [(weight, score)]}
+    per_source = {s: {name: None for name in SOURCES} for s in symbols}
     for name, fn in SOURCES.items():
         w = weights.get(name, 0.0)
         if w <= 0:
@@ -242,11 +255,14 @@ def aggregate_sentiment(symbols, cfg, backtest=False, ts_ms=None):
             for sym, score in scores.items():
                 if sym in contrib:
                     contrib[sym].append((w, score))
+                    per_source[sym][name] = score
         except Exception:
-            continue   # a source that blows up just drops out; aggregator never raises
-    out = {}
-    for sym in symbols:
-        items = contrib[sym]
-        tw = sum(w for w, _ in items)
-        out[sym] = _clamp(sum(w * sc for w, sc in items) / tw) if tw else 0.0
-    return out
+            continue   # a source that blows up just drops out; breakdown never raises
+    return {sym: {"blended": _blend(contrib[sym]), "sources": per_source[sym]}
+            for sym in symbols}
+
+
+def aggregate_sentiment(symbols, cfg, backtest=False, ts_ms=None):
+    """Blended score per symbol — a thin wrapper over breakdown()."""
+    return {sym: bd["blended"]
+            for sym, bd in breakdown(symbols, cfg, backtest, ts_ms).items()}

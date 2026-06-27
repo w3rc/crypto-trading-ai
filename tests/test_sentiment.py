@@ -200,3 +200,47 @@ def test_aggregate_survives_a_raising_source(monkeypatch):
                             lambda s, c, backtest=False, ts_ms=None: {})
     out = sentiment.aggregate_sentiment(["BTC/USDT"], _cfg())   # must NOT raise
     assert out["BTC/USDT"] == pytest.approx(0.6)                # the good source still counts
+
+
+def test_breakdown_reports_per_source_and_blended(monkeypatch):
+    monkeypatch.setitem(sentiment.SOURCES, "fear_greed",
+                        lambda s, c, backtest=False, ts_ms=None: {x: 0.8 for x in s})
+    monkeypatch.setitem(sentiment.SOURCES, "cryptopanic",
+                        lambda s, c, backtest=False, ts_ms=None: {x: -0.4 for x in s})
+    for name in ("reddit", "x_twitter"):
+        monkeypatch.setitem(sentiment.SOURCES, name,
+                            lambda s, c, backtest=False, ts_ms=None: {})
+    bd = sentiment.breakdown(["BTC/USDT"], _cfg())
+    src = bd["BTC/USDT"]["sources"]
+    assert src["fear_greed"] == 0.8
+    assert src["cryptopanic"] == -0.4
+    assert src["reddit"] is None and src["x_twitter"] is None   # absent -> None, not 0.0
+    assert set(src) == {"fear_greed", "cryptopanic", "reddit", "x_twitter"}  # all keys present
+
+
+def test_breakdown_blended_matches_aggregate(monkeypatch):
+    monkeypatch.setitem(sentiment.SOURCES, "fear_greed",
+                        lambda s, c, backtest=False, ts_ms=None: {x: 0.8 for x in s})
+    monkeypatch.setitem(sentiment.SOURCES, "cryptopanic",
+                        lambda s, c, backtest=False, ts_ms=None: {x: -0.4 for x in s})
+    for name in ("reddit", "x_twitter"):
+        monkeypatch.setitem(sentiment.SOURCES, name,
+                            lambda s, c, backtest=False, ts_ms=None: {})
+    cfg = _cfg()
+    bd = sentiment.breakdown(["BTC/USDT"], cfg)
+    agg = sentiment.aggregate_sentiment(["BTC/USDT"], cfg)
+    assert bd["BTC/USDT"]["blended"] == agg["BTC/USDT"]   # wrapper agrees with the primitive
+
+
+def test_breakdown_survives_a_raising_source(monkeypatch):
+    def boom(symbols, cfg, backtest=False, ts_ms=None):
+        raise RuntimeError("source exploded")
+    monkeypatch.setitem(sentiment.SOURCES, "cryptopanic", boom)
+    monkeypatch.setitem(sentiment.SOURCES, "fear_greed",
+                        lambda s, c, backtest=False, ts_ms=None: {x: 0.6 for x in s})
+    for name in ("reddit", "x_twitter"):
+        monkeypatch.setitem(sentiment.SOURCES, name,
+                            lambda s, c, backtest=False, ts_ms=None: {})
+    bd = sentiment.breakdown(["BTC/USDT"], _cfg())          # must not raise
+    assert bd["BTC/USDT"]["blended"] == pytest.approx(0.6)  # healthy source still counts
+    assert bd["BTC/USDT"]["sources"]["cryptopanic"] is None  # the exploding source drops out
