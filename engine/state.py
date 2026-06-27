@@ -52,6 +52,15 @@ def save_state_atomic(state: State, data_dir: str) -> None:
     os.replace(tmp, path)                   # atomic on POSIX
 
 
+def write_sentiment(snapshot: dict, data_dir: str) -> None:
+    os.makedirs(data_dir, exist_ok=True)
+    path = os.path.join(data_dir, "sentiment.json")
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(snapshot, f, indent=2)
+    os.replace(tmp, path)                   # atomic on POSIX
+
+
 def append_trade(fill: Fill, data_dir: str) -> None:
     os.makedirs(data_dir, exist_ok=True)
     path = os.path.join(data_dir, "trades.csv")
