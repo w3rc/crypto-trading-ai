@@ -227,3 +227,24 @@ def test_force_close_none_when_safe():
     from engine.broker import force_close
     pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
     assert force_close(pos, 120.0, RISK_LEV) is None
+
+def test_force_close_liquidation_short():
+    from engine.broker import force_close
+    # 5x short, avg 100 -> liq ~119.4; price 120 is above the liq price
+    pos = Position("BTC/USDT", qty=-1.0, avg_price=100.0, stop_price=105.0, leverage=5.0)
+    assert force_close(pos, 120.0, RISK_LEV) == "liquidation"
+
+def test_force_close_unleveraged_never_liquidates():
+    from engine.broker import force_close
+    RISK_SPOT = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05)
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=1.0)
+    # price 50 is below the stop but must NOT return "liquidation"
+    assert force_close(pos, 50.0, RISK_SPOT) == "stop-loss"
+
+def test_force_close_risk_without_mmr_attr_uses_default():
+    from engine.broker import force_close
+    class _R:  # a risk object lacking maintenance_margin_pct -> getattr default 0.005
+        pass
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
+    # liq ~80.4 with the default mmr; price 80 is below it -> liquidation, no AttributeError
+    assert force_close(pos, 80.0, _R()) == "liquidation"
