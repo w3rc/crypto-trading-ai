@@ -64,8 +64,8 @@ class Config:
     rules: RulesConfig = field(default_factory=RulesConfig)
     sentiment: SentimentConfig = field(default_factory=SentimentConfig)
     mode: str = "paper"
-    exchange_api_key: str = ""
-    exchange_secret: str = ""
+    exchange_api_key: str = field(default="", repr=False)
+    exchange_secret: str = field(default="", repr=False)
 
 
 def load_config(path: str = "engine/config.yaml") -> Config:

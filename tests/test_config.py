@@ -215,5 +215,18 @@ def test_mode_and_credentials_load(tmp_path, monkeypatch):
 def test_credentials_absent_are_empty(tmp_path, monkeypatch):
     monkeypatch.setenv("MYHERMES_API_KEY", "k")
     monkeypatch.delenv("EXCHANGE_API_KEY", raising=False)
+    monkeypatch.delenv("EXCHANGE_API_SECRET", raising=False)
     cfg = load_config("engine/config.yaml")
-    assert cfg.exchange_api_key == ""   # absent env -> "" (paper never needs it)
+    assert cfg.exchange_api_key == ""
+    assert cfg.exchange_secret == ""
+
+def test_credentials_excluded_from_repr():
+    from engine.config import Config, RiskConfig, LLMConfig
+    cfg = Config(exchange="x", symbols=["BTC/USDT"], timeframe="15m", paper_capital=1000.0,
+                 fee_pct=0.001, slippage_pct=0.0005, data_dir="data",
+                 risk=RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05),
+                 llm=LLMConfig(base_url="x", api_key="x", model="m", json_mode=True),
+                 exchange_api_key="SUPERSECRETKEY", exchange_secret="SUPERSECRETVALUE")
+    text = repr(cfg)
+    assert "SUPERSECRETKEY" not in text
+    assert "SUPERSECRETVALUE" not in text
