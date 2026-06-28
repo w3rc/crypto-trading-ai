@@ -46,6 +46,7 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
     equity_curve = [cfg.paper_capital]
     price_history = []
     trades = []
+    last_funding_ms = None
 
     for ts in timeline:
         windows = {sym: data[sym][data[sym]["ts"] <= ts] for sym in symbols}
@@ -60,6 +61,16 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
         for sym in symbols:
             feats[sym]["sentiment"] = sent.get(sym, 0.0)
             feats[sym]["allow_short"] = bool(cfg.risk.allow_short)
+
+        funding_due = cfg.risk.funding_rate != 0 and broker.funding_due(
+            last_funding_ms, ts, cfg.risk.funding_interval_hours)
+        if funding_due:
+            for s in symbols:
+                if positions[s].qty != 0:
+                    cash = max(0.0, cash + broker.funding_payment(
+                        positions[s], prices[s], cfg.risk.funding_rate))
+        if cfg.risk.funding_rate != 0 and (last_funding_ms is None or funding_due):
+            last_funding_ms = ts
 
         equity = cash + sum(state.position_value(positions[s], prices[s]) for s in symbols)
         for sym in symbols:

@@ -172,3 +172,15 @@ def test_backtest_runs_with_leverage(tmp_path):
     assert len(r["equity_curve"]) == len(r["buy_hold_curve"])
     assert isinstance(r["metrics"]["final_equity"], float)
     assert len(r["trades"]) > 0                  # leverage lets the buy fill
+
+
+def test_funding_bleeds_long_equity(tmp_path):
+    cfg = _cfg(tmp_path, ["BTC/USDT"])
+    feed = _feed_for({"BTC/USDT": _candles(60)})   # 1h candles; 8h funding lands ~once
+    r0 = backtest.run_backtest(["BTC/USDT"], "1h", 0, 60 * TF_MS, "indicator_rule", cfg,
+                               feed=feed, strategy=_always(Decision(action="buy", size=0.5)))
+    cfg.risk.funding_rate = 0.001                  # positive -> a held long bleeds funding
+    r1 = backtest.run_backtest(["BTC/USDT"], "1h", 0, 60 * TF_MS, "indicator_rule", cfg,
+                               feed=feed, strategy=_always(Decision(action="buy", size=0.5)))
+    assert r1["metrics"]["final_equity"] < r0["metrics"]["final_equity"]   # funding cost
+    assert len(r1["equity_curve"]) == len(r1["buy_hold_curve"])             # curves aligned
