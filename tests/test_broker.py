@@ -4,6 +4,8 @@ from engine.config import RiskConfig
 from engine.broker import plan_order, stop_triggered
 
 RISK = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05)
+RISK_LEV = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05, leverage=5.0,
+                      maintenance_margin_pct=0.005)
 
 def test_buy_capped_by_max_position_pct():
     o = plan_order(Decision(action="buy", size=1.0),
@@ -188,3 +190,40 @@ def test_cover_clamped_when_cash_short_no_crash():
     assert fill.qty < 1.0                      # only a partial cover was affordable
     assert -1.0 < pos2.qty < 0.0               # still short, but smaller
     assert cash2 >= -1e-6                       # never overspent
+
+
+def test_liquidation_price_long():
+    from engine.broker import liquidation_price
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
+    assert liquidation_price(pos, 0.005) == pytest.approx(100 * (1 - 1/5) / (1 - 0.005))
+
+def test_liquidation_price_short():
+    from engine.broker import liquidation_price
+    pos = Position("BTC/USDT", qty=-1.0, avg_price=100.0, stop_price=105.0, leverage=5.0)
+    assert liquidation_price(pos, 0.005) == pytest.approx(100 * (1 + 1/5) / (1 + 0.005))
+
+def test_liquidation_price_unleveraged_is_zero():
+    from engine.broker import liquidation_price
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=1.0)
+    assert liquidation_price(pos, 0.005) == 0.0
+
+def test_liquidation_price_flat_is_zero():
+    from engine.broker import liquidation_price
+    assert liquidation_price(Position("BTC/USDT", leverage=5.0), 0.005) == 0.0
+
+def test_force_close_liquidation_outranks_stop():
+    from engine.broker import force_close
+    # 5x long, avg 100 -> liq ~80.4; price 80 is below BOTH the 95 stop and the liq price
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
+    assert force_close(pos, 80.0, RISK_LEV) == "liquidation"
+
+def test_force_close_stop_when_only_stop_hit():
+    from engine.broker import force_close
+    # price 90 is below the 95 stop but above the ~80.4 liq price
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
+    assert force_close(pos, 90.0, RISK_LEV) == "stop-loss"
+
+def test_force_close_none_when_safe():
+    from engine.broker import force_close
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
+    assert force_close(pos, 120.0, RISK_LEV) is None

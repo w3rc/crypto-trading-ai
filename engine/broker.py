@@ -52,6 +52,35 @@ def stop_triggered(position: Position, price: float) -> bool:
     return False
 
 
+def liquidation_price(position: Position, maintenance_margin_pct: float) -> float:
+    """Isolated-margin liquidation price; 0.0 means 'never' (unleveraged/flat)."""
+    L = position.leverage
+    avg = position.avg_price
+    if L <= 1.0 or avg <= 0 or abs(position.qty) <= _EPS:
+        return 0.0
+    mmr = maintenance_margin_pct
+    if position.qty > 0:
+        return avg * (1 - 1.0 / L) / (1 - mmr)
+    return avg * (1 + 1.0 / L) / (1 + mmr)
+
+
+def force_close(position: Position, price: float, risk) -> str | None:
+    """Why the position must be force-closed this cycle, if at all.
+
+    Liquidation outranks the protective stop. Returns "liquidation",
+    "stop-loss", or None.
+    """
+    liq = liquidation_price(position, getattr(risk, "maintenance_margin_pct", 0.005))
+    if liq > 0:
+        if position.qty > 0 and price <= liq:
+            return "liquidation"
+        if position.qty < 0 and price >= liq:
+            return "liquidation"
+    if stop_triggered(position, price):
+        return "stop-loss"
+    return None
+
+
 def _stop_price(avg: float, qty: float, stop_loss_pct: float) -> float:
     return avg * (1 - stop_loss_pct) if qty > 0 else avg * (1 + stop_loss_pct)
 
