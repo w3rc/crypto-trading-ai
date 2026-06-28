@@ -184,3 +184,21 @@ def test_short_stop_loss_covers_with_buy(tmp_path):
     bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.positions["BTC/USDT"].qty == 0.0   # covered to flat via a buy-to-close
+
+
+def test_leveraged_position_liquidated_on_adverse_move(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.risk.leverage = 5.0
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.cash = 0.0
+    # 5x long, avg 210 -> liq ~168.8; stop sits low (1.0) so only liquidation can fire.
+    # current price 159 is below the liq price -> must force-close as a liquidation.
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=210.0,
+                                         stop_price=1.0, leverage=5.0)
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path), cfg.risk.maintenance_margin_pct)
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.positions["BTC/USDT"].qty == 0.0          # force-closed
+    rec = _json.loads((tmp_path / "decisions.jsonl").read_text().strip().splitlines()[-1])
+    assert rec["reason"] == "liquidation"

@@ -59,3 +59,34 @@ def test_write_sentiment_atomic_json(tmp_path):
     assert loaded["symbols"]["BTC/USDT"]["blended"] == -0.62
     assert loaded["symbols"]["BTC/USDT"]["sources"]["cryptopanic"] is None
     assert not (tmp_path / "sentiment.json.tmp").exists()   # temp cleaned up (atomic replace)
+
+def test_equity_unchanged_for_long_book(tmp_path):
+    st = load_state(str(tmp_path), 1000.0, ["BTC/USDT"])
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=2.0, avg_price=500.0)  # 1x long
+    assert equity(st, {"BTC/USDT": 600.0}) == 1000.0 + 2.0 * 600.0   # == old cash+qty*price
+
+def test_equity_leveraged_long_is_margin_plus_unrealized(tmp_path):
+    st = load_state(str(tmp_path), 1000.0, ["BTC/USDT"])
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=2.0, avg_price=500.0, leverage=5.0)
+    # margin 2*500/5 = 200; unrealized 2*(600-500) = 200
+    assert equity(st, {"BTC/USDT": 600.0}) == 1000.0 + 200.0 + 200.0
+
+def test_save_load_preserves_leverage(tmp_path):
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=2.0, avg_price=100.0,
+                                         stop_price=95.0, leverage=5.0)
+    save_state_atomic(st, str(tmp_path))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.positions["BTC/USDT"].leverage == 5.0
+
+def test_snapshot_includes_liq_price_for_leveraged(tmp_path):
+    import json
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=100.0,
+                                         stop_price=95.0, leverage=5.0)
+    save_state_atomic(st, str(tmp_path), maintenance_margin_pct=0.005)
+    raw = json.loads((tmp_path / "state.json").read_text())
+    assert raw["positions"]["BTC/USDT"]["liq_price"] > 0    # written for the dashboard
+    # and a snapshot carrying liq_price reloads cleanly (key stripped)
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.positions["BTC/USDT"].qty == 1.0

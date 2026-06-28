@@ -8,6 +8,8 @@ data_dir: data
 risk:
   max_position_pct: 0.25
   stop_loss_pct: 0.05
+  # leverage: 1.0              # >1 enables isolated-margin leverage (opt-in)
+  # maintenance_margin_pct: 0.005   # margin floor that triggers liquidation
 llm:
   base_url: https://ai.myhermes.cloud/v1
   api_key_env: MYHERMES_API_KEY

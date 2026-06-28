@@ -1,5 +1,6 @@
 export type EquityPoint = { ts: string; equity: number };
-export type Position = { symbol?: string; qty: number; avg_price: number; stop_price: number };
+export type Position = { symbol?: string; qty: number; avg_price: number; stop_price: number;
+                         leverage?: number; liq_price?: number };
 export type State = { cash: number; positions: Record<string, Position>; equity_history: EquityPoint[] };
 export type Trade = { ts: string; symbol: string; side: string; qty: number; price: number; fee: number };
 export type Decision = { ts: string; symbol: string; action: string; reason: string; price: number; executed: boolean };

@@ -160,3 +160,15 @@ def test_backtest_can_short_when_allow_short(tmp_path):
                               feed=feed, strategy=_always(Decision(action="sell", size=1.0)))
     assert any(t.side == "sell" for t in r["trades"])   # opened shorts
     assert len(r["equity_curve"]) == len(r["buy_hold_curve"])
+
+
+def test_backtest_runs_with_leverage(tmp_path):
+    # leverage must not crash the replay and must still produce aligned curves
+    cfg = _cfg(tmp_path, ["BTC/USDT"])
+    cfg.risk.leverage = 3.0
+    feed = _feed_for({"BTC/USDT": _candles(60)})
+    r = backtest.run_backtest(["BTC/USDT"], "1h", 0, 60 * TF_MS, "indicator_rule", cfg,
+                              feed=feed, strategy=_always(Decision(action="buy", size=0.5)))
+    assert len(r["equity_curve"]) == len(r["buy_hold_curve"])
+    assert isinstance(r["metrics"]["final_equity"], float)
+    assert len(r["trades"]) > 0                  # leverage lets the buy fill

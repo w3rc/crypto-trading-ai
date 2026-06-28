@@ -81,8 +81,20 @@ python -m engine.backtest --since 2024-01-01 --strategy sentiment_rule
 
 Set `risk.allow_short: true` (or point at a derivatives exchange, where it auto-enables) to
 let the bot hold **short** positions: a `sell` from flat opens a short (`qty < 0`), a `buy`
-covers it, and the stop-loss works both directions. Capped by `max_position_pct` like longs;
-no leverage yet. The dashboard's positions table shows a **Side** (Long/Short) column.
+covers it, and the stop-loss works both directions. Capped by `max_position_pct` like longs.
+The dashboard's positions table shows a **Side** (Long/Short) column.
+
+## Leverage + liquidation
+
+Set `risk.leverage` > 1 to trade with **leverage** (isolated margin, opt-in — the default
+`1.0` is unleveraged and changes nothing). Each position posts `margin = |qty|·avg / leverage`,
+so the exposure cap rises to `max_position_pct · equity · leverage`. A position is **liquidated**
+— force-closed at its isolated liquidation price — when an adverse move erodes that margin down
+to `risk.maintenance_margin_pct` (default 0.5%). The protective stop-loss still fires first on
+low leverage; liquidation is the high-leverage / gap backstop, and a gap *past* the liquidation
+price is socialized as bad debt (cash never goes negative). Like shorting, this only activates on
+a derivatives venue or explicit config — the default spot setup is unchanged. The positions table
+shows **Lev** and **Liq. price** columns.
 
 ## Tests
 ```bash

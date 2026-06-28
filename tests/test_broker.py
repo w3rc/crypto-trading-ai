@@ -4,6 +4,8 @@ from engine.config import RiskConfig
 from engine.broker import plan_order, stop_triggered
 
 RISK = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05)
+RISK_LEV = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05, leverage=5.0,
+                      maintenance_margin_pct=0.005)
 
 def test_buy_capped_by_max_position_pct():
     o = plan_order(Decision(action="buy", size=1.0),
@@ -68,14 +70,14 @@ def test_buy_clamped_to_cash_no_crash():
     assert cash2 >= -1e-6                     # never overspent
     assert pos2.qty == pytest.approx(fill.qty)
 
-def test_sell_beyond_long_flips_to_short():
+def test_sell_beyond_long_clamps_at_flat():
     from engine.broker import apply_fill
     from engine.models import Order
+    # a sell larger than the long reduces to flat (no single-order flip; gate forbids it)
     pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0)
-    pos2, cash2, _ = apply_fill(Order("sell", 5.0, 100.0), pos, 0.0, 0.0, 0.0, 0.05, "t")
-    assert pos2.qty == pytest.approx(-4.0)             # 1 long - 5 sold = 4 short
-    assert pos2.avg_price == pytest.approx(100.0)      # new short entry = fill price
-    assert pos2.stop_price == pytest.approx(105.0)     # short stop above entry
+    pos2, _, fill = apply_fill(Order("sell", 5.0, 100.0), pos, 0.0, 0.0, 0.0, 0.05, "t")
+    assert pos2.qty == 0.0                             # closed to flat, not flipped
+    assert fill.qty == pytest.approx(1.0)              # only the 1 unit to flat filled
 
 
 def test_open_short_sets_negative_qty_and_stop_above():
@@ -86,7 +88,7 @@ def test_open_short_sets_negative_qty_and_stop_above():
     assert pos2.qty == pytest.approx(-2.0)
     assert pos2.avg_price == pytest.approx(100.0)
     assert pos2.stop_price == pytest.approx(105.0)     # 100*(1+0.05)
-    assert cash2 == pytest.approx(1200.0)              # received 2*100 proceeds
+    assert cash2 == pytest.approx(800.0)               # isolated margin: 1000 - 200 locked
 
 
 def test_extend_short_weighted_avg():
@@ -147,16 +149,37 @@ def test_partial_sell_preserves_avg_and_stop():
 RISK_S = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05, allow_short=True)
 
 
-def test_sell_when_flat_opens_short_capped():
-    # equity 1000 -> cap 250; sell from flat opens a short up to the cap
+def test_buy_cap_scales_with_leverage():
+    # equity 1000, cap 0.25 -> 250 at 1x; 5x lifts the cap to 1250 notional / 10 = 125
+    risk = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05, leverage=5.0)
+    o = plan_order(Decision(action="buy", size=1.0),
+                   Position("BTC/USDT"), cash=10000, price=10, equity=1000, risk=risk)
+    assert o.qty == pytest.approx(125.0)
+
+def test_buy_open_bounded_by_cash_times_leverage():
+    # only 100 cash, 5x -> can open up to 100*5=500 notional / 10 = 50 (margin-bounded)
+    risk = RiskConfig(max_position_pct=1.0, stop_loss_pct=0.05, leverage=5.0)
+    o = plan_order(Decision(action="buy", size=1.0),
+                   Position("BTC/USDT"), cash=100, price=10, equity=1_000_000, risk=risk)
+    assert o.qty == pytest.approx(50.0)
+
+def test_short_open_bounded_by_cash_times_leverage():
+    # short open now needs margin: 100 cash, 5x -> 500 notional / 10 = 50
+    risk = RiskConfig(max_position_pct=1.0, stop_loss_pct=0.05, leverage=5.0, allow_short=True)
     o = plan_order(Decision(action="sell", size=1.0),
-                   Position("BTC/USDT"), cash=0, price=10, equity=1000, risk=RISK_S)
+                   Position("BTC/USDT"), cash=100, price=10, equity=1_000_000, risk=risk)
+    assert o.side == "sell" and o.qty == pytest.approx(50.0)
+
+def test_sell_when_flat_opens_short_capped():
+    # equity 1000 -> cap 250; sell from flat opens a short up to the cap (needs margin now)
+    o = plan_order(Decision(action="sell", size=1.0),
+                   Position("BTC/USDT"), cash=10000, price=10, equity=1000, risk=RISK_S)
     assert o.side == "sell" and o.qty == pytest.approx(25.0)   # 250 notional / 10
 
 
 def test_sell_extends_short_up_to_cap():
     pos = Position("BTC/USDT", qty=-10, avg_price=10, stop_price=10.5)  # short notional 100
-    o = plan_order(Decision(action="sell", size=1.0), pos, cash=0, price=10, equity=1000, risk=RISK_S)
+    o = plan_order(Decision(action="sell", size=1.0), pos, cash=10000, price=10, equity=1000, risk=RISK_S)
     assert o.qty == pytest.approx(15.0)    # remaining short headroom 250-100=150 / 10
 
 
@@ -178,13 +201,94 @@ def test_sell_when_flat_is_none_without_allow_short():
                       Position("BTC/USDT"), cash=0, price=10, equity=1000, risk=RISK) is None
 
 
-def test_cover_clamped_when_cash_short_no_crash():
+
+def test_open_long_locks_margin_not_full_notional():
     from engine.broker import apply_fill
     from engine.models import Order
-    # short 1 @ 100, but only 50 cash and price gapped to 200 -> cover costs ~200 > cash.
-    # must partial-cover (no AssertionError, no negative cash), leaving a residual short.
+    # 5x: opening 5 @ 100 (notional 500) locks only 500/5 = 100 of cash
+    pos2, cash2, _ = apply_fill(Order("buy", 5.0, 100.0), Position("BTC/USDT"), 1000.0,
+                                0.0, 0.0, 0.05, "t", leverage=5.0)
+    assert pos2.qty == pytest.approx(5.0)
+    assert pos2.avg_price == pytest.approx(100.0)
+    assert pos2.leverage == 5.0
+    assert cash2 == pytest.approx(900.0)          # 1000 - 100 margin (not 500)
+
+def test_leveraged_long_roundtrip_pnl_matches_unleveraged():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    # leverage changes margin, not absolute P&L: +10 move on 1 unit = +10 either way
+    pos2, cash2, _ = apply_fill(Order("buy", 1.0, 100.0), Position("BTC/USDT"), 1000.0,
+                                0.0, 0.0, 0.05, "t", leverage=5.0)
+    pos3, cash3, _ = apply_fill(Order("sell", 1.0, 110.0), pos2, cash2,
+                                0.0, 0.0, 0.05, "t2", leverage=5.0)
+    assert pos3.qty == 0.0
+    assert cash3 == pytest.approx(1010.0)         # +10 profit, same as 1x
+
+def test_bad_debt_cover_clamps_cash_to_zero_no_crash():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    # underwater short, price gapped far past liquidation: cover realizes a loss
+    # bigger than released margin -> cash clamps to 0 (bad debt), never negative/crash
     pos = Position("BTC/USDT", qty=-1.0, avg_price=100.0, stop_price=105.0)
-    pos2, cash2, fill = apply_fill(Order("buy", 1.0, 200.0), pos, 50.0, 0.0, 0.0, 0.05, "t")
-    assert fill.qty < 1.0                      # only a partial cover was affordable
-    assert -1.0 < pos2.qty < 0.0               # still short, but smaller
-    assert cash2 >= -1e-6                       # never overspent
+    pos2, cash2, fill = apply_fill(Order("buy", 1.0, 250.0), pos, 10.0, 0.0, 0.0, 0.05, "t")
+    assert fill.qty == pytest.approx(1.0)         # fully covers (margin released)
+    assert pos2.qty == 0.0
+    assert cash2 == 0.0                            # bad-debt clamp, no crash
+
+
+def test_liquidation_price_long():
+    from engine.broker import liquidation_price
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
+    assert liquidation_price(pos, 0.005) == pytest.approx(100 * (1 - 1/5) / (1 - 0.005))
+
+def test_liquidation_price_short():
+    from engine.broker import liquidation_price
+    pos = Position("BTC/USDT", qty=-1.0, avg_price=100.0, stop_price=105.0, leverage=5.0)
+    assert liquidation_price(pos, 0.005) == pytest.approx(100 * (1 + 1/5) / (1 + 0.005))
+
+def test_liquidation_price_unleveraged_is_zero():
+    from engine.broker import liquidation_price
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=1.0)
+    assert liquidation_price(pos, 0.005) == 0.0
+
+def test_liquidation_price_flat_is_zero():
+    from engine.broker import liquidation_price
+    assert liquidation_price(Position("BTC/USDT", leverage=5.0), 0.005) == 0.0
+
+def test_force_close_liquidation_outranks_stop():
+    from engine.broker import force_close
+    # 5x long, avg 100 -> liq ~80.4; price 80 is below BOTH the 95 stop and the liq price
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
+    assert force_close(pos, 80.0, RISK_LEV) == "liquidation"
+
+def test_force_close_stop_when_only_stop_hit():
+    from engine.broker import force_close
+    # price 90 is below the 95 stop but above the ~80.4 liq price
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
+    assert force_close(pos, 90.0, RISK_LEV) == "stop-loss"
+
+def test_force_close_none_when_safe():
+    from engine.broker import force_close
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
+    assert force_close(pos, 120.0, RISK_LEV) is None
+
+def test_force_close_liquidation_short():
+    from engine.broker import force_close
+    # 5x short, avg 100 -> liq ~119.4; price 120 is above the liq price
+    pos = Position("BTC/USDT", qty=-1.0, avg_price=100.0, stop_price=105.0, leverage=5.0)
+    assert force_close(pos, 120.0, RISK_LEV) == "liquidation"
+
+def test_force_close_unleveraged_never_liquidates():
+    from engine.broker import force_close
+    RISK_SPOT = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05)
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=1.0)
+    # price 50 is below the stop but must NOT return "liquidation"
+    assert force_close(pos, 50.0, RISK_SPOT) == "stop-loss"
+
+def test_force_close_risk_without_mmr_attr_uses_default():
+    from engine.broker import force_close
+    class _R:  # a risk object lacking maintenance_margin_pct -> getattr default 0.005
+        pass
+    pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
+    # liq ~80.4 with the default mmr; price 80 is below it -> liquidation, no AttributeError
+    assert force_close(pos, 80.0, _R()) == "liquidation"
