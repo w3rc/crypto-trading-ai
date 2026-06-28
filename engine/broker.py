@@ -14,15 +14,16 @@ def plan_order(decision: Decision, position: Position, cash: float,
     if price <= 0:
         return None
     allow_short = bool(getattr(risk, "allow_short", False))   # None/False -> long-only
+    lev = max(1.0, getattr(risk, "leverage", 1.0))
     qty = position.qty
-    max_value = risk.max_position_pct * equity
+    max_value = risk.max_position_pct * equity * lev          # leverage scales the cap
 
     if decision.action == "buy":
         if qty < 0:                                   # cover a short -> clamp at flat
-            q = min(decision.size * equity / price, -qty)
+            q = min(decision.size * equity * lev / price, -qty)
         else:                                         # open/extend long
             headroom = max(0.0, max_value - qty * price)
-            q = min(decision.size * equity, headroom, cash) / price
+            q = min(decision.size * equity * lev, headroom, cash * lev) / price
         if q * price < _EPS:
             return None
         return Order(side="buy", qty=q, price=price)
@@ -30,9 +31,9 @@ def plan_order(decision: Decision, position: Position, cash: float,
     if decision.action == "sell":
         if qty > 0:                                   # reduce long -> clamp at flat
             q = min(decision.size * qty, qty)
-        elif allow_short:                             # open/extend short
+        elif allow_short:                             # open/extend short (needs margin)
             short_headroom = max(0.0, max_value - (-qty) * price)
-            q = min(decision.size * equity, short_headroom) / price
+            q = min(decision.size * equity * lev, short_headroom, cash * lev) / price
         else:
             return None                               # spot long-only
         if q * price < _EPS:

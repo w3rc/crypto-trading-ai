@@ -149,16 +149,37 @@ def test_partial_sell_preserves_avg_and_stop():
 RISK_S = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05, allow_short=True)
 
 
-def test_sell_when_flat_opens_short_capped():
-    # equity 1000 -> cap 250; sell from flat opens a short up to the cap
+def test_buy_cap_scales_with_leverage():
+    # equity 1000, cap 0.25 -> 250 at 1x; 5x lifts the cap to 1250 notional / 10 = 125
+    risk = RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05, leverage=5.0)
+    o = plan_order(Decision(action="buy", size=1.0),
+                   Position("BTC/USDT"), cash=10000, price=10, equity=1000, risk=risk)
+    assert o.qty == pytest.approx(125.0)
+
+def test_buy_open_bounded_by_cash_times_leverage():
+    # only 100 cash, 5x -> can open up to 100*5=500 notional / 10 = 50 (margin-bounded)
+    risk = RiskConfig(max_position_pct=1.0, stop_loss_pct=0.05, leverage=5.0)
+    o = plan_order(Decision(action="buy", size=1.0),
+                   Position("BTC/USDT"), cash=100, price=10, equity=1_000_000, risk=risk)
+    assert o.qty == pytest.approx(50.0)
+
+def test_short_open_bounded_by_cash_times_leverage():
+    # short open now needs margin: 100 cash, 5x -> 500 notional / 10 = 50
+    risk = RiskConfig(max_position_pct=1.0, stop_loss_pct=0.05, leverage=5.0, allow_short=True)
     o = plan_order(Decision(action="sell", size=1.0),
-                   Position("BTC/USDT"), cash=0, price=10, equity=1000, risk=RISK_S)
+                   Position("BTC/USDT"), cash=100, price=10, equity=1_000_000, risk=risk)
+    assert o.side == "sell" and o.qty == pytest.approx(50.0)
+
+def test_sell_when_flat_opens_short_capped():
+    # equity 1000 -> cap 250; sell from flat opens a short up to the cap (needs margin now)
+    o = plan_order(Decision(action="sell", size=1.0),
+                   Position("BTC/USDT"), cash=10000, price=10, equity=1000, risk=RISK_S)
     assert o.side == "sell" and o.qty == pytest.approx(25.0)   # 250 notional / 10
 
 
 def test_sell_extends_short_up_to_cap():
     pos = Position("BTC/USDT", qty=-10, avg_price=10, stop_price=10.5)  # short notional 100
-    o = plan_order(Decision(action="sell", size=1.0), pos, cash=0, price=10, equity=1000, risk=RISK_S)
+    o = plan_order(Decision(action="sell", size=1.0), pos, cash=10000, price=10, equity=1000, risk=RISK_S)
     assert o.qty == pytest.approx(15.0)    # remaining short headroom 250-100=150 / 10
 
 
