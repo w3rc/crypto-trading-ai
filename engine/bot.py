@@ -145,7 +145,7 @@ def _run_shadow(cfg, market, strategy) -> None:
             cash, qty_by = market.fetch_balance(exchange, cfg.symbols)
         except Exception as e:                   # bad/missing key or network -> no decisions, no crash
             log.warning("shadow: balance fetch failed: %s", e)
-            print(f"[SHADOW] balance fetch failed ({e}); no decisions this cycle")
+            print(f"[SHADOW] balance unavailable ({e}); sizing with cash=0 and empty positions")
             cash, qty_by = 0.0, {}
 
         prices: dict[str, float] = {}

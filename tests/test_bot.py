@@ -323,6 +323,8 @@ def test_shadow_balance_failure_does_not_crash(tmp_path):
         def fetch_balance(self, ex, symbols): raise RuntimeError("auth failed")
     bot.run_once(cfg, market=FailBalanceMarket(), strategy=_strat(Decision(action="hold")))
     assert (tmp_path / "status.json").exists()                     # cycle survived, status still written
+    assert not (tmp_path / "state.json").exists()   # still writes no money state
+    assert not (tmp_path / "trades.csv").exists()    # still places nothing
 
 def test_paper_mode_still_simulates(tmp_path):
     cfg = _cfg(tmp_path)   # mode defaults "paper"
