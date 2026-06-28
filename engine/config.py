@@ -12,6 +12,8 @@ class RiskConfig:
     allow_short: Optional[bool] = None
     leverage: float = 1.0
     maintenance_margin_pct: float = 0.005
+    funding_rate: float = 0.0
+    funding_interval_hours: float = 8.0
 
 
 @dataclass
@@ -91,6 +93,8 @@ def load_config(path: str = "engine/config.yaml") -> Config:
             allow_short=raw["risk"].get("allow_short", None),
             leverage=lev,
             maintenance_margin_pct=mmr,
+            funding_rate=float(raw["risk"].get("funding_rate", 0.0)),
+            funding_interval_hours=float(raw["risk"].get("funding_interval_hours", 8.0)),
         ),
         llm=LLMConfig(
             base_url=llm["base_url"],

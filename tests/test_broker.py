@@ -292,3 +292,31 @@ def test_force_close_risk_without_mmr_attr_uses_default():
     pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0, leverage=5.0)
     # liq ~80.4 with the default mmr; price 80 is below it -> liquidation, no AttributeError
     assert force_close(pos, 80.0, _R()) == "liquidation"
+
+
+def test_funding_payment_long_pays_on_positive_rate():
+    from engine.broker import funding_payment
+    pos = Position("BTC/USDT", qty=2.0, avg_price=100.0)
+    assert funding_payment(pos, 110.0, 0.001) == pytest.approx(-0.22)   # 0.001*2*110, long pays
+
+def test_funding_payment_short_receives_on_positive_rate():
+    from engine.broker import funding_payment
+    pos = Position("BTC/USDT", qty=-2.0, avg_price=100.0)
+    assert funding_payment(pos, 110.0, 0.001) == pytest.approx(0.22)    # short receives
+
+def test_funding_payment_negative_rate_flips():
+    from engine.broker import funding_payment
+    pos = Position("BTC/USDT", qty=2.0, avg_price=100.0)
+    assert funding_payment(pos, 110.0, -0.001) == pytest.approx(0.22)   # long receives on -rate
+
+def test_funding_payment_flat_is_zero():
+    from engine.broker import funding_payment
+    assert funding_payment(Position("BTC/USDT"), 110.0, 0.001) == 0.0
+
+def test_funding_due_boundary():
+    from engine.broker import funding_due
+    h = 3_600_000
+    assert funding_due(0, 8 * h - 1, 8) is False     # just under the 8h interval
+    assert funding_due(0, 8 * h, 8) is True          # exactly at the boundary
+    assert funding_due(0, 9 * h, 8) is True
+    assert funding_due(None, 8 * h, 8) is False      # no prior funding -> never due

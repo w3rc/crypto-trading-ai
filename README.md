@@ -96,6 +96,16 @@ price is socialized as bad debt (cash never goes negative). Like shorting, this 
 a derivatives venue or explicit config — the default spot setup is unchanged. The positions table
 shows **Lev** and **Liq. price** columns.
 
+## Funding
+
+Set `risk.funding_rate` (per `risk.funding_interval_hours`, default 8h) to charge perpetual
+**funding** on open positions: a positive rate means **longs pay shorts** (and vice versa),
+`funding_rate · notional` each interval. It debits/credits cash (clamped ≥ 0) and so erodes or
+boosts equity for as long as a position is held — the holding cost the leverage + liquidation model
+was missing. `funding_rate = 0` (the default) is off and changes nothing. Funding is an account
+cash flow here; it doesn't shift a position's isolated liquidation price (the realistic refinement,
+and a live ccxt funding feed, are the upgrade paths).
+
 ## Tests
 ```bash
 python -m pytest -q

@@ -82,6 +82,24 @@ def force_close(position: Position, price: float, risk) -> str | None:
     return None
 
 
+def funding_payment(position: Position, price: float, funding_rate: float) -> float:
+    """Signed cash delta from one funding charge: -rate*qty*price.
+
+    Positive rate -> longs pay (negative delta), shorts receive (positive). Flat -> 0.
+    """
+    return -funding_rate * position.qty * price
+
+
+def funding_due(last_ms, now_ms, interval_hours: float) -> bool:
+    """True once a funding interval has elapsed since last_ms (epoch ms).
+
+    last_ms is None -> False (first observation initializes the clock, never pays).
+    """
+    if last_ms is None:
+        return False
+    return (now_ms - last_ms) >= interval_hours * 3_600_000
+
+
 def _stop_price(avg: float, qty: float, stop_loss_pct: float) -> float:
     return avg * (1 - stop_loss_pct) if qty > 0 else avg * (1 + stop_loss_pct)
 

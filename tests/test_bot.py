@@ -1,4 +1,5 @@
 import json as _json
+import pytest
 import pandas as pd
 from engine import bot
 from engine.config import Config, RiskConfig, LLMConfig, SentimentConfig
@@ -202,3 +203,46 @@ def test_leveraged_position_liquidated_on_adverse_move(tmp_path):
     assert st2.positions["BTC/USDT"].qty == 0.0          # force-closed
     rec = _json.loads((tmp_path / "decisions.jsonl").read_text().strip().splitlines()[-1])
     assert rec["reason"] == "liquidation"
+
+
+def test_funding_charges_long_across_interval(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.risk.funding_rate = 0.001
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.cash = 10000.0
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=150.0, stop_price=1.0)
+    st.last_funding_ts = "2020-01-01T00:00:00+00:00"   # long ago -> funding is due
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path))
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.cash == pytest.approx(10000.0 - 0.001 * 1.0 * 159.0)   # long paid funding
+    assert st2.last_funding_ts is not None and st2.last_funding_ts > "2026-01-01"  # clock advanced to ~now
+    assert st2.positions["BTC/USDT"].qty == 1.0                        # position untouched
+
+def test_funding_short_receives(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.risk.funding_rate = 0.001
+    cfg.risk.allow_short = True
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.cash = 10000.0
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=-1.0, avg_price=170.0, stop_price=1e9)
+    st.last_funding_ts = "2020-01-01T00:00:00+00:00"
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path))
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.cash == pytest.approx(10000.0 + 0.001 * 1.0 * 159.0)   # short received funding
+    assert st2.positions["BTC/USDT"].qty == -1.0   # short stayed open (not force-closed)
+
+def test_funding_off_no_charge_no_timestamp(tmp_path):
+    cfg = _cfg(tmp_path)   # funding_rate defaults 0.0
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.cash = 5000.0
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=150.0, stop_price=1.0)
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path))
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.cash == 5000.0                  # no funding applied
+    assert st2.last_funding_ts is None         # not tracked when funding is off

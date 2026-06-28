@@ -10,6 +10,8 @@ risk:
   stop_loss_pct: 0.05
   # leverage: 1.0              # >1 enables isolated-margin leverage (opt-in)
   # maintenance_margin_pct: 0.005   # margin floor that triggers liquidation
+  # funding_rate: 0.0            # per-interval perp funding (opt-in); + => longs pay shorts
+  # funding_interval_hours: 8.0  # how often funding is charged
 llm:
   base_url: https://ai.myhermes.cloud/v1
   api_key_env: MYHERMES_API_KEY

@@ -27,6 +27,14 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
         bd = (sentiment_mod.breakdown(cfg.symbols, cfg)
               if cfg.sentiment.enabled else {})
 
+        funding_on = cfg.risk.funding_rate != 0
+        funding_due = False
+        if funding_on:
+            now_ms = datetime.fromisoformat(ts).timestamp() * 1000
+            last_ms = (datetime.fromisoformat(st.last_funding_ts).timestamp() * 1000
+                       if st.last_funding_ts else None)
+            funding_due = broker.funding_due(last_ms, now_ms, cfg.risk.funding_interval_hours)
+
         for sym in cfg.symbols:
             try:
                 df = market.fetch_ohlcv_df(exchange, sym, cfg.timeframe)
@@ -44,6 +52,10 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
             feats["allow_short"] = bool(cfg.risk.allow_short)
             prices[sym] = price
             pos = st.positions[sym]
+            if funding_due and pos.qty != 0:
+                pay = broker.funding_payment(pos, price, cfg.risk.funding_rate)
+                st.cash = max(0.0, st.cash + pay)
+                print(f"[{sym}] FUNDING {pay:+.4f}")
             equity = state_mod.equity(st, prices)   # best-effort equity for sizing
 
             reason = broker.force_close(pos, price, cfg.risk)
@@ -80,6 +92,8 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
                 log.warning("sentiment snapshot write failed: %s", e)
 
         if prices:
+            if funding_on and (st.last_funding_ts is None or funding_due):
+                st.last_funding_ts = ts
             total = state_mod.equity(st, prices)
             st.equity_history.append({"ts": ts, "equity": total})
             state_mod.save_state_atomic(st, cfg.data_dir, cfg.risk.maintenance_margin_pct)
