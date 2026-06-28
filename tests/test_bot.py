@@ -246,3 +246,51 @@ def test_funding_off_no_charge_no_timestamp(tmp_path):
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.cash == 5000.0                  # no funding applied
     assert st2.last_funding_ts is None         # not tracked when funding is off
+
+def test_funding_accrues_cumulative(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.risk.funding_rate = 0.001
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=150.0, stop_price=1.0)
+    st.last_funding_ts = "2020-01-01T00:00:00+00:00"
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path))
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.funding_accrued == pytest.approx(-0.001 * 1.0 * 159.0)   # long paid -> negative
+
+def test_funding_accrued_stays_zero_when_off(tmp_path):
+    cfg = _cfg(tmp_path)   # funding off (rate defaults 0.0)
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=150.0, stop_price=1.0)
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path))
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.funding_accrued == 0.0
+
+def test_status_written_with_resolved_mode(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    cfg.risk.allow_short = None        # auto -> resolved from the exchange
+    cfg.risk.leverage = 3.0
+    monkeypatch.setattr(bot.market_mod, "supports_short", lambda ex: True)
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    data = _json.loads((tmp_path / "status.json").read_text())
+    assert data["strategy"] == cfg.strategy
+    assert data["exchange"] == cfg.exchange
+    assert data["risk"]["allow_short"] is True      # resolved None -> True (written as a bool)
+    assert data["risk"]["leverage"] == 3.0
+    for key in ("maintenance_margin_pct", "funding_rate", "funding_interval_hours",
+                "max_position_pct", "stop_loss_pct"):
+        assert key in data["risk"], f"missing risk field: {key}"
+    assert "accrued" in data["funding"] and "last_funding_ts" in data["funding"]
+
+def test_status_write_failure_does_not_abort(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    def boom(*a, **k):
+        raise IOError("disk full")
+    monkeypatch.setattr(bot.state_mod, "write_status", boom)
+    # the cycle still completes and persists the trade despite the status write failing
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="buy", size=1.0)))
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st.positions["BTC/USDT"].qty > 0

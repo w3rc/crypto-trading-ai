@@ -3,9 +3,12 @@ import type { Snapshot } from "../../lib/parse";
 import EquityChart from "./components/EquityChart";
 import PositionsTable from "./components/PositionsTable";
 import DecisionLog from "./components/DecisionLog";
+import TradesTable from "./components/TradesTable";
 import SentimentPanel from "./components/SentimentPanel";
+import BacktestChart from "./components/BacktestChart";
+import StatusStrip from "./components/StatusStrip";
 
-const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null };
+const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [] };
 const api = (window as unknown as { api: { getSnapshot: () => Promise<Snapshot> } }).api;
 
 export default function App(): React.JSX.Element {
@@ -39,6 +42,11 @@ export default function App(): React.JSX.Element {
 
       <div className="grid">
         <div className="card span2">
+          <h2>Status</h2>
+          <StatusStrip status={snap.status} />
+        </div>
+
+        <div className="card span2">
           <h2>Account</h2>
           <div className="kpis">
             <div className="kpi"><div className="label">Equity</div><div className="value">${equity.toFixed(2)}</div></div>
@@ -66,9 +74,19 @@ export default function App(): React.JSX.Element {
           <DecisionLog decisions={snap.decisions} />
         </div>
 
+        <div className="card">
+          <h2>Trades</h2>
+          <TradesTable trades={snap.trades} />
+        </div>
+
         <div className="card span2">
           <h2>Sentiment</h2>
           <SentimentPanel sentiment={snap.sentiment} />
+        </div>
+
+        <div className="card span2">
+          <h2>Backtest</h2>
+          <BacktestChart points={snap.backtest} />
         </div>
       </div>
     </main>

@@ -45,3 +45,8 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .sent-sources { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
 .sent-src b { color: var(--text); font-weight: 600; }
 .sent-strategy { margin-top: 12px; font-size: 12px; }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px;
+        background: var(--glass); border: 1px solid var(--glass-border); border-radius: 10px; }
+.chip-k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+.chip-v { font-size: 14px; font-weight: 600; }
