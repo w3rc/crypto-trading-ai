@@ -135,3 +135,42 @@ def test_risk_leverage_explicit(tmp_path, monkeypatch):
     cfg = load_config(str(p))
     assert cfg.risk.leverage == 5.0
     assert cfg.risk.maintenance_margin_pct == 0.004
+
+
+def _risk_yaml(risk_lines: str) -> str:
+    return (
+        "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
+        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: data\n"
+        f"risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n{risk_lines}"
+        "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
+    )
+
+
+def test_leverage_clamped_to_ceiling(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(_risk_yaml("  leverage: 500\n"))
+    # default mmr 0.005 -> ceiling 0.5/0.005 = 100; an absurd 500x clamps so a long
+    # cannot liquidate on open (liq reaches entry above 1/mmr = 200x).
+    assert load_config(str(p)).risk.leverage == 100.0
+
+
+def test_leverage_floored_at_one(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(_risk_yaml("  leverage: 0.5\n"))
+    assert load_config(str(p)).risk.leverage == 1.0   # sub-1x is nonsensical -> floored
+
+
+def test_leverage_ceiling_scales_with_mmr(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(_risk_yaml("  leverage: 100\n  maintenance_margin_pct: 0.02\n"))
+    assert load_config(str(p)).risk.leverage == 25.0  # higher mmr -> lower ceiling 0.5/0.02
+
+
+def test_normal_leverage_passes_through(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(_risk_yaml("  leverage: 5\n"))
+    assert load_config(str(p)).risk.leverage == 5.0   # within bounds -> untouched
