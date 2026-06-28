@@ -5,6 +5,7 @@ import PositionsTable from "./components/PositionsTable";
 import DecisionLog from "./components/DecisionLog";
 import TradesTable from "./components/TradesTable";
 import SentimentPanel from "./components/SentimentPanel";
+import BacktestChart from "./components/BacktestChart";
 import StatusStrip from "./components/StatusStrip";
 
 const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [] };
@@ -81,6 +82,11 @@ export default function App(): React.JSX.Element {
         <div className="card span2">
           <h2>Sentiment</h2>
           <SentimentPanel sentiment={snap.sentiment} />
+        </div>
+
+        <div className="card span2">
+          <h2>Backtest</h2>
+          <BacktestChart points={snap.backtest} />
         </div>
       </div>
     </main>
