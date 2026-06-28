@@ -268,3 +268,26 @@ def test_funding_accrued_stays_zero_when_off(tmp_path):
     bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.funding_accrued == 0.0
+
+def test_status_written_with_resolved_mode(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    cfg.risk.allow_short = None        # auto -> resolved from the exchange
+    cfg.risk.leverage = 3.0
+    monkeypatch.setattr(bot.market_mod, "supports_short", lambda ex: True)
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    data = _json.loads((tmp_path / "status.json").read_text())
+    assert data["strategy"] == cfg.strategy
+    assert data["exchange"] == cfg.exchange
+    assert data["risk"]["allow_short"] is True      # resolved None -> True (written as a bool)
+    assert data["risk"]["leverage"] == 3.0
+    assert "accrued" in data["funding"] and "last_funding_ts" in data["funding"]
+
+def test_status_write_failure_does_not_abort(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    def boom(*a, **k):
+        raise IOError("disk full")
+    monkeypatch.setattr(bot.state_mod, "write_status", boom)
+    # the cycle still completes and persists the trade despite the status write failing
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="buy", size=1.0)))
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st.positions["BTC/USDT"].qty > 0

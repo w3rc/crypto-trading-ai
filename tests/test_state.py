@@ -124,3 +124,15 @@ def test_funding_accrued_defaults_zero_and_old_snapshot(tmp_path):
     del raw["funding_accrued"]
     (tmp_path / "state.json").write_text(json.dumps(raw))
     assert load_state(str(tmp_path), 10000.0, ["BTC/USDT"]).funding_accrued == 0.0
+
+def test_write_status_atomic_json(tmp_path):
+    from engine.state import write_status
+    import json
+    write_status({"ts": "t1", "strategy": "hybrid", "exchange": "binance",
+                  "risk": {"allow_short": True, "leverage": 5.0},
+                  "funding": {"accrued": -1.0, "last_funding_ts": None}}, str(tmp_path))
+    path = tmp_path / "status.json"
+    assert path.exists()
+    loaded = json.loads(path.read_text())
+    assert loaded["strategy"] == "hybrid" and loaded["risk"]["allow_short"] is True
+    assert not (tmp_path / "status.json.tmp").exists()   # temp cleaned (atomic replace)

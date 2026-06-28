@@ -102,6 +102,25 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
         else:
             print(f"cash={st.cash:.2f} (no symbols priced this cycle)")
 
+        try:                                     # advisory: a status write error never aborts the cycle
+            state_mod.write_status({
+                "ts": ts,
+                "strategy": cfg.strategy,
+                "exchange": cfg.exchange,
+                "risk": {
+                    "allow_short": bool(cfg.risk.allow_short),
+                    "leverage": cfg.risk.leverage,
+                    "maintenance_margin_pct": cfg.risk.maintenance_margin_pct,
+                    "funding_rate": cfg.risk.funding_rate,
+                    "funding_interval_hours": cfg.risk.funding_interval_hours,
+                    "max_position_pct": cfg.risk.max_position_pct,
+                    "stop_loss_pct": cfg.risk.stop_loss_pct,
+                },
+                "funding": {"accrued": st.funding_accrued, "last_funding_ts": st.last_funding_ts},
+            }, cfg.data_dir)
+        except Exception as e:
+            log.warning("status snapshot write failed: %s", e)
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
