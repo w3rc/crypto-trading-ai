@@ -189,3 +189,31 @@ def test_funding_explicit(tmp_path, monkeypatch):
     cfg = load_config(str(p))
     assert cfg.risk.funding_rate == 0.0001
     assert cfg.risk.funding_interval_hours == 4.0
+
+
+def test_mode_defaults_paper(monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    assert load_config("engine/config.yaml").mode == "paper"
+
+def test_mode_and_credentials_load(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    monkeypatch.setenv("EXCHANGE_API_KEY", "pubkey")
+    monkeypatch.setenv("EXCHANGE_API_SECRET", "secret")
+    p = tmp_path / "c.yaml"
+    p.write_text(
+        "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
+        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: data\n"
+        "mode: shadow\n"
+        "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
+        "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
+    )
+    cfg = load_config(str(p))
+    assert cfg.mode == "shadow"
+    assert cfg.exchange_api_key == "pubkey"
+    assert cfg.exchange_secret == "secret"
+
+def test_credentials_absent_are_empty(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    monkeypatch.delenv("EXCHANGE_API_KEY", raising=False)
+    cfg = load_config("engine/config.yaml")
+    assert cfg.exchange_api_key == ""   # absent env -> "" (paper never needs it)
