@@ -4,6 +4,7 @@ import EquityChart from "./components/EquityChart";
 import PositionsTable from "./components/PositionsTable";
 import DecisionLog from "./components/DecisionLog";
 import SentimentPanel from "./components/SentimentPanel";
+import StatusStrip from "./components/StatusStrip";
 
 const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [] };
 const api = (window as unknown as { api: { getSnapshot: () => Promise<Snapshot> } }).api;
@@ -38,6 +39,11 @@ export default function App(): React.JSX.Element {
       <div className="sub">Read-only · polls every 5s · {snap.trades.length} trades logged</div>
 
       <div className="grid">
+        <div className="card span2">
+          <h2>Status</h2>
+          <StatusStrip status={snap.status} />
+        </div>
+
         <div className="card span2">
           <h2>Account</h2>
           <div className="kpis">
