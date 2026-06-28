@@ -90,3 +90,20 @@ def test_snapshot_includes_liq_price_for_leveraged(tmp_path):
     # and a snapshot carrying liq_price reloads cleanly (key stripped)
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.positions["BTC/USDT"].qty == 1.0
+
+def test_last_funding_ts_roundtrips(tmp_path):
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.last_funding_ts = "2026-06-28T08:00:00+00:00"
+    save_state_atomic(st, str(tmp_path))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.last_funding_ts == "2026-06-28T08:00:00+00:00"
+
+def test_last_funding_ts_defaults_none_and_old_snapshot(tmp_path):
+    import json
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st.last_funding_ts is None                 # fresh state
+    save_state_atomic(st, str(tmp_path))
+    raw = json.loads((tmp_path / "state.json").read_text())
+    del raw["last_funding_ts"]                         # simulate a pre-funding snapshot
+    (tmp_path / "state.json").write_text(json.dumps(raw))
+    assert load_state(str(tmp_path), 10000.0, ["BTC/USDT"]).last_funding_ts is None
