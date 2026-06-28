@@ -45,3 +45,25 @@ test("readSnapshot reads sentiment.json, null when absent", async () => {
   expect((await readSnapshot(empty)).sentiment).toBeNull();   // missing file -> null
   rmSync(empty, { recursive: true, force: true });
 });
+
+test("readSnapshot reads status.json + backtest_equity.csv, defaults when absent", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "snap-status-"));
+  writeFileSync(join(dir, "status.json"), JSON.stringify({
+    ts: "t1", strategy: "hybrid", exchange: "binance",
+    risk: { allow_short: true, leverage: 5, maintenance_margin_pct: 0.005,
+            funding_rate: 0.0001, funding_interval_hours: 8, max_position_pct: 0.25, stop_loss_pct: 0.05 },
+    funding: { accrued: -1.5, last_funding_ts: "t0" },
+  }));
+  writeFileSync(join(dir, "backtest_equity.csv"), "ts,equity,buy_hold\n,10000,10000\n1,10200,10100\n");
+  const snap = await readSnapshot(dir);
+  expect(snap.status?.risk.leverage).toBe(5);
+  expect(snap.status?.funding.accrued).toBe(-1.5);
+  expect(snap.backtest).toHaveLength(2);
+  rmSync(dir, { recursive: true, force: true });
+
+  const empty = mkdtempSync(join(tmpdir(), "snap-nostatus-"));
+  const s = await readSnapshot(empty);
+  expect(s.status).toBeNull();      // missing -> null
+  expect(s.backtest).toEqual([]);   // missing -> []
+  rmSync(empty, { recursive: true, force: true });
+});

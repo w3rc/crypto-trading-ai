@@ -5,7 +5,7 @@ import PositionsTable from "./components/PositionsTable";
 import DecisionLog from "./components/DecisionLog";
 import SentimentPanel from "./components/SentimentPanel";
 
-const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null };
+const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [] };
 const api = (window as unknown as { api: { getSnapshot: () => Promise<Snapshot> } }).api;
 
 export default function App(): React.JSX.Element {

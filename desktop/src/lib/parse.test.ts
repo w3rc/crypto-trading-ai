@@ -38,3 +38,18 @@ test("parseSentiment round-trips a snapshot", () => {
   expect(s.symbols["BTC/USDT"].sources.fear_greed).toBe(-0.78);
   expect(s.symbols["BTC/USDT"].sources.reddit).toBeNull();
 });
+
+import { parseBacktestCsv } from "./parse";
+
+test("parseBacktestCsv parses baseline + data rows", () => {
+  const csv = "ts,equity,buy_hold\n,10000,10000\n1700000000000,10250,10100\n";
+  const pts = parseBacktestCsv(csv);
+  expect(pts).toHaveLength(2);
+  expect(pts[0]).toEqual({ ts: "", equity: 10000, buyHold: 10000 });   // baseline (empty ts)
+  expect(pts[1]).toEqual({ ts: "1700000000000", equity: 10250, buyHold: 10100 });
+});
+
+test("parseBacktestCsv empty / header-only -> []", () => {
+  expect(parseBacktestCsv("")).toEqual([]);
+  expect(parseBacktestCsv("ts,equity,buy_hold\n")).toEqual([]);
+});
