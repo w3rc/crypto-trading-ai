@@ -2,7 +2,7 @@ import argparse
 import time
 from datetime import datetime, timezone
 
-from engine import broker, datafeed, indicators, market, metrics, sentiment, strategies
+from engine import broker, datafeed, indicators, market, metrics, sentiment, state, strategies
 from engine.config import load_config
 from engine.models import Order, Position
 
@@ -61,11 +61,12 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
             feats[sym]["sentiment"] = sent.get(sym, 0.0)
             feats[sym]["allow_short"] = bool(cfg.risk.allow_short)
 
-        equity = cash + sum(positions[s].qty * prices[s] for s in symbols)
+        equity = cash + sum(state.position_value(positions[s], prices[s]) for s in symbols)
         for sym in symbols:
             pos = positions[sym]
             price = prices[sym]
-            if broker.stop_triggered(pos, price):
+            reason = broker.force_close(pos, price, cfg.risk)
+            if reason:
                 order = Order("sell", pos.qty, price) if pos.qty > 0 else Order("buy", -pos.qty, price)
             else:
                 decision = strat(feats[sym], pos, cash, cfg)
@@ -73,11 +74,11 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
             if order is not None:
                 positions[sym], cash, fill = broker.apply_fill(
                     order, pos, cash, cfg.fee_pct, cfg.slippage_pct,
-                    cfg.risk.stop_loss_pct, _iso(ts))
+                    cfg.risk.stop_loss_pct, _iso(ts), cfg.risk.leverage)
                 trades.append(fill)
 
         price_history.append(prices)
-        equity_curve.append(cash + sum(positions[s].qty * prices[s] for s in symbols))
+        equity_curve.append(cash + sum(state.position_value(positions[s], prices[s]) for s in symbols))
 
     buy_hold_curve = _buy_hold_curve(price_history, symbols, cfg)
     summary = metrics.summarize(equity_curve, buy_hold_curve, len(trades))

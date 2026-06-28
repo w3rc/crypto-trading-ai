@@ -46,9 +46,9 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
             pos = st.positions[sym]
             equity = state_mod.equity(st, prices)   # best-effort equity for sizing
 
-            if broker.stop_triggered(pos, price):
-                close = Order("sell", pos.qty, price) if pos.qty > 0 else Order("buy", -pos.qty, price)
-                order, reason = close, "stop-loss"
+            reason = broker.force_close(pos, price, cfg.risk)
+            if reason:                                # "liquidation" | "stop-loss"
+                order = Order("sell", pos.qty, price) if pos.qty > 0 else Order("buy", -pos.qty, price)
             else:
                 decision = strategy(feats, pos, st.cash, cfg)
                 order = broker.plan_order(decision, pos, st.cash, price, equity, cfg.risk)
@@ -66,7 +66,7 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
 
             new_pos, new_cash, fill = broker.apply_fill(
                 order, pos, st.cash, cfg.fee_pct, cfg.slippage_pct,
-                cfg.risk.stop_loss_pct, ts)
+                cfg.risk.stop_loss_pct, ts, cfg.risk.leverage)
             st.positions[sym] = new_pos
             st.cash = new_cash
             state_mod.append_trade(fill, cfg.data_dir)
@@ -82,7 +82,7 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
         if prices:
             total = state_mod.equity(st, prices)
             st.equity_history.append({"ts": ts, "equity": total})
-            state_mod.save_state_atomic(st, cfg.data_dir)
+            state_mod.save_state_atomic(st, cfg.data_dir, cfg.risk.maintenance_margin_pct)
             print(f"cash={st.cash:.2f} equity={total:.2f}")
         else:
             print(f"cash={st.cash:.2f} (no symbols priced this cycle)")
