@@ -69,6 +69,14 @@ def load_config(path: str = "engine/config.yaml") -> Config:
     llm = raw["llm"]
     rules_raw = raw.get("rules", {})
     sent_raw = raw.get("sentiment", {})
+    mmr = float(raw["risk"].get("maintenance_margin_pct", 0.005))
+    # ponytail: floor leverage at 1x; cap below 1/mmr so a long can't liquidate on
+    # open (liq >= entry at/above 1/mmr). 0.5/mmr keeps the liq price clear of entry;
+    # mmr <= 0 disables liquidation, so no ceiling is needed there.
+    lev = float(raw["risk"].get("leverage", 1.0))
+    if mmr > 0:
+        lev = min(lev, 0.5 / mmr)
+    lev = max(1.0, lev)
     return Config(
         exchange=raw["exchange"],
         symbols=list(raw["symbols"]),
@@ -81,8 +89,8 @@ def load_config(path: str = "engine/config.yaml") -> Config:
             max_position_pct=float(raw["risk"]["max_position_pct"]),
             stop_loss_pct=float(raw["risk"]["stop_loss_pct"]),
             allow_short=raw["risk"].get("allow_short", None),
-            leverage=float(raw["risk"].get("leverage", 1.0)),
-            maintenance_margin_pct=float(raw["risk"].get("maintenance_margin_pct", 0.005)),
+            leverage=lev,
+            maintenance_margin_pct=mmr,
         ),
         llm=LLMConfig(
             base_url=llm["base_url"],
