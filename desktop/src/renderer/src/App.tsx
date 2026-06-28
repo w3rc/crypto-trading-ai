@@ -3,6 +3,7 @@ import type { Snapshot } from "../../lib/parse";
 import EquityChart from "./components/EquityChart";
 import PositionsTable from "./components/PositionsTable";
 import DecisionLog from "./components/DecisionLog";
+import TradesTable from "./components/TradesTable";
 import SentimentPanel from "./components/SentimentPanel";
 import StatusStrip from "./components/StatusStrip";
 
@@ -70,6 +71,11 @@ export default function App(): React.JSX.Element {
         <div className="card">
           <h2>Decisions <span className="muted" style={{ textTransform: "none", letterSpacing: 0 }}>(* = not executed)</span></h2>
           <DecisionLog decisions={snap.decisions} />
+        </div>
+
+        <div className="card">
+          <h2>Trades</h2>
+          <TradesTable trades={snap.trades} />
         </div>
 
         <div className="card span2">
