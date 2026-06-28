@@ -63,6 +63,9 @@ class Config:
     strategy: str = "hybrid"
     rules: RulesConfig = field(default_factory=RulesConfig)
     sentiment: SentimentConfig = field(default_factory=SentimentConfig)
+    mode: str = "paper"
+    exchange_api_key: str = field(default="", repr=False)
+    exchange_secret: str = field(default="", repr=False)
 
 
 def load_config(path: str = "engine/config.yaml") -> Config:
@@ -118,4 +121,7 @@ def load_config(path: str = "engine/config.yaml") -> Config:
             sell_max=float(sent_raw.get("sell_max", -0.5)),
             http_timeout=float(sent_raw.get("http_timeout", 6.0)),
         ),
+        mode=raw.get("mode", "paper"),
+        exchange_api_key=os.environ.get(raw.get("exchange_api_key_env", "EXCHANGE_API_KEY"), ""),
+        exchange_secret=os.environ.get(raw.get("exchange_secret_env", "EXCHANGE_API_SECRET"), ""),
     )

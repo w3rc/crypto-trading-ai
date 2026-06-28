@@ -5,6 +5,7 @@ export default function StatusStrip({ status }: { status: Status | null }) {
   if (!status) return <div className="empty">Waiting for the bot to write status…</div>;
   const r = status.risk;
   const chips: [string, string][] = [
+    ["Mode", (status.mode ?? "paper").toUpperCase()],
     ["Strategy", status.strategy],
     ["Exchange", status.exchange],
     ["Leverage", leverageMode(r.leverage)],

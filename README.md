@@ -110,6 +110,16 @@ was missing. `funding_rate = 0` (the default) is off and changes nothing. Fundin
 cash flow here; it doesn't shift a position's isolated liquidation price (the realistic refinement,
 and a live ccxt funding feed, are the upgrade paths).
 
+## Shadow mode (real-account dry-run)
+
+Set `mode: shadow` to run the bot against your **real exchange account read-only** - it fetches
+your real balance + price, computes the order it *would* place, and logs it (decisions show
+`executed: false` with a `[shadow]` reason), but **places nothing and moves no money**. Use a
+**read-only / no-trade API key** in `.env` (`EXCHANGE_API_KEY` / `EXCHANGE_API_SECRET`). The
+dashboard's Status strip shows `MODE: SHADOW`. This is the dry-run stage before live execution:
+`paper` (simulated) -> `shadow` (real reads, zero execution) -> live (slice 2). `create_order` does
+not exist in the codebase yet - shadow cannot trade.
+
 ## Tests
 ```bash
 python -m pytest -q

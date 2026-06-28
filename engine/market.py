@@ -12,8 +12,12 @@ def supports_short(exchange) -> bool:
     return options.get("defaultType", "spot") in _DERIVATIVE_TYPES
 
 
-def make_exchange(name: str):
-    return getattr(ccxt, name)({"enableRateLimit": True})
+def make_exchange(name: str, mode: str = "paper", api_key: str = "", secret: str = ""):
+    opts = {"enableRateLimit": True}
+    if mode == "shadow":
+        opts["apiKey"] = api_key
+        opts["secret"] = secret
+    return getattr(ccxt, name)(opts)
 
 
 def fetch_ohlcv_df(exchange, symbol: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
@@ -24,3 +28,17 @@ def fetch_ohlcv_df(exchange, symbol: str, timeframe: str, limit: int = 200) -> p
 
 def fetch_price(exchange, symbol: str) -> float:
     return float(exchange.fetch_ticker(symbol)["last"])
+
+
+def fetch_balance(exchange, symbols: list[str]) -> tuple[float, dict[str, float]]:
+    """Real account balance, read-only: (free quote, {symbol: free base})."""
+    bal = exchange.fetch_balance()
+
+    def free(asset: str) -> float:
+        return float((bal.get(asset) or {}).get("free", 0.0) or 0.0)
+
+    quote = symbols[0].split("/")[1] if symbols else "USDT"
+    # ponytail: assumes one shared quote across symbols (USDT); multi-quote is a later refinement.
+    cash = free(quote)
+    qty = {s: free(s.split("/")[0]) for s in symbols}
+    return cash, qty

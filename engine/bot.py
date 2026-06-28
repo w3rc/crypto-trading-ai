@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from engine import broker, indicators, market as market_mod, sentiment as sentiment_mod, state as state_mod, strategies as strategies_mod
 from engine.config import load_config
-from engine.models import Order
+from engine.models import Order, Position
 
 log = logging.getLogger("bot")
 
@@ -12,10 +12,33 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _status_payload(cfg, ts, funding_accrued, last_funding_ts):
+    return {
+        "ts": ts,
+        "mode": cfg.mode,
+        "strategy": cfg.strategy,
+        "exchange": cfg.exchange,
+        "risk": {
+            "allow_short": bool(cfg.risk.allow_short),
+            "leverage": cfg.risk.leverage,
+            "maintenance_margin_pct": cfg.risk.maintenance_margin_pct,
+            "funding_rate": cfg.risk.funding_rate,
+            "funding_interval_hours": cfg.risk.funding_interval_hours,
+            "max_position_pct": cfg.risk.max_position_pct,
+            "stop_loss_pct": cfg.risk.stop_loss_pct,
+        },
+        "funding": {"accrued": funding_accrued, "last_funding_ts": last_funding_ts},
+    }
+
+
 def run_once(cfg=None, market=None, strategy=None) -> None:
     cfg = cfg or load_config()
     market = market or market_mod
     strategy = strategy or strategies_mod.get(cfg.strategy)
+
+    if cfg.mode == "shadow":
+        _run_shadow(cfg, market, strategy)
+        return
 
     with state_mod.acquire_lock(cfg.data_dir):
         st = state_mod.load_state(cfg.data_dir, cfg.paper_capital, cfg.symbols)
@@ -103,21 +126,62 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
             print(f"cash={st.cash:.2f} (no symbols priced this cycle)")
 
         try:                                     # advisory: a status write error never aborts the cycle
-            state_mod.write_status({
-                "ts": ts,
-                "strategy": cfg.strategy,
-                "exchange": cfg.exchange,
-                "risk": {
-                    "allow_short": bool(cfg.risk.allow_short),
-                    "leverage": cfg.risk.leverage,
-                    "maintenance_margin_pct": cfg.risk.maintenance_margin_pct,
-                    "funding_rate": cfg.risk.funding_rate,
-                    "funding_interval_hours": cfg.risk.funding_interval_hours,
-                    "max_position_pct": cfg.risk.max_position_pct,
-                    "stop_loss_pct": cfg.risk.stop_loss_pct,
-                },
-                "funding": {"accrued": st.funding_accrued, "last_funding_ts": st.last_funding_ts},
-            }, cfg.data_dir)
+            state_mod.write_status(
+                _status_payload(cfg, ts, st.funding_accrued, st.last_funding_ts), cfg.data_dir)
+        except Exception as e:
+            log.warning("status snapshot write failed: %s", e)
+
+
+def _run_shadow(cfg, market, strategy) -> None:
+    """Dry-run against the REAL account: read balance + price, log the order we WOULD place, execute nothing."""
+    with state_mod.acquire_lock(cfg.data_dir):
+        exchange = market.make_exchange(cfg.exchange, cfg.mode,
+                                        cfg.exchange_api_key, cfg.exchange_secret)
+        if cfg.risk.allow_short is None:
+            cfg.risk.allow_short = market_mod.supports_short(exchange)
+        ts = _now()
+        bd = (sentiment_mod.breakdown(cfg.symbols, cfg) if cfg.sentiment.enabled else {})
+        try:
+            cash, qty_by = market.fetch_balance(exchange, cfg.symbols)
+        except Exception as e:                   # bad/missing key or network -> no decisions, no crash
+            log.warning("shadow: balance fetch failed: %s", e)
+            print(f"[SHADOW] balance unavailable ({e}); sizing with cash=0 and empty positions")
+            cash, qty_by = 0.0, {}
+
+        prices: dict[str, float] = {}
+        for sym in cfg.symbols:
+            try:
+                df = market.fetch_ohlcv_df(exchange, sym, cfg.timeframe)
+                feats = indicators.compute_indicators(df)
+                price = market.fetch_price(exchange, sym)
+                if price <= 0:
+                    raise ValueError(f"non-positive price: {price}")
+            except Exception as e:
+                log.warning("skip %s: %s", sym, e)
+                print(f"[{sym}] SKIP ({e})")
+                continue
+
+            feats["price"] = price
+            feats["sentiment"] = bd.get(sym, {}).get("blended", 0.0)
+            feats["allow_short"] = bool(cfg.risk.allow_short)
+            prices[sym] = price
+            pos = Position(sym, qty=qty_by.get(sym, 0.0))         # real holding; no entry/stop tracking
+            equity = cash + sum(qty_by.get(s, 0.0) * prices.get(s, 0.0) for s in cfg.symbols)
+            decision = strategy(feats, pos, cash, cfg)
+            order = broker.plan_order(decision, pos, cash, price, equity, cfg.risk)
+
+            action = order.side if order else "hold"
+            state_mod.append_decision(
+                {"ts": ts, "symbol": sym, "action": action,
+                 "reason": f"[shadow] {decision.reason}", "price": price, "executed": False},
+                cfg.data_dir)
+            if order is None:
+                print(f"[SHADOW][{sym}] HOLD @ {price:.2f} — {decision.reason}")
+            else:
+                print(f"[SHADOW][{sym}] would {order.side.upper()} {order.qty:.6f} @ ~{price:.2f}")
+
+        try:                                     # advisory; mode=shadow, no funding state in shadow
+            state_mod.write_status(_status_payload(cfg, ts, 0.0, None), cfg.data_dir)
         except Exception as e:
             log.warning("status snapshot write failed: %s", e)
 

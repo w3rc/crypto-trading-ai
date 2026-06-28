@@ -33,3 +33,27 @@ def test_supports_short_swap_is_true():
 def test_supports_short_unknown_or_none_is_false():
     assert market.supports_short(SimpleNamespace()) is False   # no .options
     assert market.supports_short(None) is False
+
+
+def test_make_exchange_shadow_loads_credentials():
+    ex = market.make_exchange("binance", "shadow", "KEY123", "SECRET456")
+    assert ex.apiKey == "KEY123"
+    assert ex.secret == "SECRET456"
+
+
+def test_make_exchange_paper_has_no_credentials():
+    ex = market.make_exchange("binance")        # 1-arg paper call unchanged
+    assert not ex.apiKey                        # "" / None -> falsy
+
+
+class BalanceExchange:
+    def fetch_balance(self):
+        return {"USDT": {"free": 5000.0, "used": 0.0, "total": 5000.0},
+                "BTC": {"free": 0.25, "used": 0.0, "total": 0.25}}
+
+
+def test_fetch_balance_maps_quote_and_base():
+    cash, qty = market.fetch_balance(BalanceExchange(), ["BTC/USDT", "ETH/USDT"])
+    assert cash == 5000.0                        # free USDT (shared quote)
+    assert qty["BTC/USDT"] == 0.25
+    assert qty["ETH/USDT"] == 0.0                # no ETH balance -> 0.0
