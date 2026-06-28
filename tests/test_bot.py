@@ -294,3 +294,40 @@ def test_status_write_failure_does_not_abort(tmp_path, monkeypatch):
     bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="buy", size=1.0)))
     st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st.positions["BTC/USDT"].qty > 0
+
+
+def test_shadow_logs_intent_executes_nothing(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.mode = "shadow"
+    class ShadowMarket:
+        def make_exchange(self, name, mode="paper", api_key="", secret=""): return object()
+        def fetch_ohlcv_df(self, ex, sym, tf, limit=200): return _df()
+        def fetch_price(self, ex, sym): return 159.0
+        def fetch_balance(self, ex, symbols): return 5000.0, {s: 0.0 for s in symbols}
+    bot.run_once(cfg, market=ShadowMarket(), strategy=_strat(Decision(action="buy", size=1.0)))
+    rec = _json.loads((tmp_path / "decisions.jsonl").read_text().strip().splitlines()[-1])
+    assert rec["action"] == "buy" and rec["executed"] is False     # intended, not executed
+    assert rec["reason"].startswith("[shadow]")
+    assert not (tmp_path / "trades.csv").exists()                  # NO fill written
+    assert not (tmp_path / "state.json").exists()                  # NO money state written
+    data = _json.loads((tmp_path / "status.json").read_text())
+    assert data["mode"] == "shadow"
+
+def test_shadow_balance_failure_does_not_crash(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.mode = "shadow"
+    class FailBalanceMarket:
+        def make_exchange(self, name, mode="paper", api_key="", secret=""): return object()
+        def fetch_ohlcv_df(self, ex, sym, tf, limit=200): return _df()
+        def fetch_price(self, ex, sym): return 159.0
+        def fetch_balance(self, ex, symbols): raise RuntimeError("auth failed")
+    bot.run_once(cfg, market=FailBalanceMarket(), strategy=_strat(Decision(action="hold")))
+    assert (tmp_path / "status.json").exists()                     # cycle survived, status still written
+
+def test_paper_mode_still_simulates(tmp_path):
+    cfg = _cfg(tmp_path)   # mode defaults "paper"
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="buy", size=1.0)))
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st.positions["BTC/USDT"].qty > 0                        # paper path unchanged
+    data = _json.loads((tmp_path / "status.json").read_text())
+    assert data["mode"] == "paper"                                 # status now carries mode
