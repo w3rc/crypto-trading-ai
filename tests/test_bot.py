@@ -280,6 +280,9 @@ def test_status_written_with_resolved_mode(tmp_path, monkeypatch):
     assert data["exchange"] == cfg.exchange
     assert data["risk"]["allow_short"] is True      # resolved None -> True (written as a bool)
     assert data["risk"]["leverage"] == 3.0
+    for key in ("maintenance_margin_pct", "funding_rate", "funding_interval_hours",
+                "max_position_pct", "stop_loss_pct"):
+        assert key in data["risk"], f"missing risk field: {key}"
     assert "accrued" in data["funding"] and "last_funding_ts" in data["funding"]
 
 def test_status_write_failure_does_not_abort(tmp_path, monkeypatch):
