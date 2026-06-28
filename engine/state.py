@@ -6,9 +6,11 @@ import sys
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
+from engine import broker
 from engine.models import Position, Fill
 
 _TRADE_HEADER = ["ts", "symbol", "side", "qty", "price", "fee"]
+_POS_FIELDS = {"symbol", "qty", "avg_price", "stop_price", "leverage"}
 
 
 @dataclass
@@ -16,6 +18,12 @@ class State:
     cash: float
     positions: dict
     equity_history: list = field(default_factory=list)
+
+
+def position_value(p, price: float) -> float:
+    """Account value of a position: margin + unrealized P&L (isolated margin)."""
+    lev = getattr(p, "leverage", 1.0) or 1.0
+    return abs(p.qty) * p.avg_price / lev + p.qty * (price - p.avg_price)
 
 
 def _state_path(data_dir: str) -> str:
@@ -31,18 +39,22 @@ def load_state(data_dir: str, initial_capital: float, symbols: list[str]) -> Sta
                      equity_history=[])
     with open(path) as f:
         raw = json.load(f)
-    positions = {s: Position(**p) for s, p in raw["positions"].items()}
+    positions = {s: Position(**{k: v for k, v in p.items() if k in _POS_FIELDS})
+                 for s, p in raw["positions"].items()}
     for s in symbols:                       # ensure newly-added symbols exist
         positions.setdefault(s, Position(s))
     return State(cash=raw["cash"], positions=positions,
                  equity_history=raw.get("equity_history", []))
 
 
-def save_state_atomic(state: State, data_dir: str) -> None:
+def save_state_atomic(state: State, data_dir: str,
+                      maintenance_margin_pct: float = 0.005) -> None:
     os.makedirs(data_dir, exist_ok=True)
     payload = {
         "cash": state.cash,
-        "positions": {s: vars(p) for s, p in state.positions.items()},
+        "positions": {s: {**vars(p),
+                          "liq_price": broker.liquidation_price(p, maintenance_margin_pct)}
+                      for s, p in state.positions.items()},
         "equity_history": state.equity_history,
     }
     path = _state_path(data_dir)
@@ -80,10 +92,8 @@ def append_decision(record: dict, data_dir: str) -> None:
 
 
 def equity(state: State, price_map: dict) -> float:
-    total = state.cash
-    for s, p in state.positions.items():
-        total += p.qty * price_map.get(s, p.avg_price)
-    return total
+    return state.cash + sum(position_value(p, price_map.get(s, p.avg_price))
+                            for s, p in state.positions.items())
 
 
 @contextmanager
