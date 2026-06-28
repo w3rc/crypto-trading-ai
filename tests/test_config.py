@@ -115,3 +115,23 @@ def test_risk_allow_short_explicit(tmp_path, monkeypatch):
         "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
     )
     assert load_config(str(p)).risk.allow_short is True
+
+def test_risk_leverage_and_mmr_default(monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    cfg = load_config("engine/config.yaml")
+    assert cfg.risk.leverage == 1.0                 # opt-in: off by default
+    assert cfg.risk.maintenance_margin_pct == 0.005
+
+def test_risk_leverage_explicit(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(
+        "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
+        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: data\n"
+        "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
+        "  leverage: 5\n  maintenance_margin_pct: 0.004\n"
+        "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
+    )
+    cfg = load_config(str(p))
+    assert cfg.risk.leverage == 5.0
+    assert cfg.risk.maintenance_margin_pct == 0.004

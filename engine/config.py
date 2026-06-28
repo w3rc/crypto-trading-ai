@@ -10,6 +10,8 @@ class RiskConfig:
     max_position_pct: float
     stop_loss_pct: float
     allow_short: Optional[bool] = None
+    leverage: float = 1.0
+    maintenance_margin_pct: float = 0.005
 
 
 @dataclass
@@ -79,6 +81,8 @@ def load_config(path: str = "engine/config.yaml") -> Config:
             max_position_pct=float(raw["risk"]["max_position_pct"]),
             stop_loss_pct=float(raw["risk"]["stop_loss_pct"]),
             allow_short=raw["risk"].get("allow_short", None),
+            leverage=float(raw["risk"].get("leverage", 1.0)),
+            maintenance_margin_pct=float(raw["risk"].get("maintenance_margin_pct", 0.005)),
         ),
         llm=LLMConfig(
             base_url=llm["base_url"],

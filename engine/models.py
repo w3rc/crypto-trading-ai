@@ -22,6 +22,7 @@ class Position:
     qty: float = 0.0
     avg_price: float = 0.0
     stop_price: float = 0.0
+    leverage: float = 1.0
 
 
 @dataclass
