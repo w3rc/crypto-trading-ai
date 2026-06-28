@@ -70,14 +70,14 @@ def test_buy_clamped_to_cash_no_crash():
     assert cash2 >= -1e-6                     # never overspent
     assert pos2.qty == pytest.approx(fill.qty)
 
-def test_sell_beyond_long_flips_to_short():
+def test_sell_beyond_long_clamps_at_flat():
     from engine.broker import apply_fill
     from engine.models import Order
+    # a sell larger than the long reduces to flat (no single-order flip; gate forbids it)
     pos = Position("BTC/USDT", qty=1.0, avg_price=100.0, stop_price=95.0)
-    pos2, cash2, _ = apply_fill(Order("sell", 5.0, 100.0), pos, 0.0, 0.0, 0.0, 0.05, "t")
-    assert pos2.qty == pytest.approx(-4.0)             # 1 long - 5 sold = 4 short
-    assert pos2.avg_price == pytest.approx(100.0)      # new short entry = fill price
-    assert pos2.stop_price == pytest.approx(105.0)     # short stop above entry
+    pos2, _, fill = apply_fill(Order("sell", 5.0, 100.0), pos, 0.0, 0.0, 0.0, 0.05, "t")
+    assert pos2.qty == 0.0                             # closed to flat, not flipped
+    assert fill.qty == pytest.approx(1.0)              # only the 1 unit to flat filled
 
 
 def test_open_short_sets_negative_qty_and_stop_above():
@@ -88,7 +88,7 @@ def test_open_short_sets_negative_qty_and_stop_above():
     assert pos2.qty == pytest.approx(-2.0)
     assert pos2.avg_price == pytest.approx(100.0)
     assert pos2.stop_price == pytest.approx(105.0)     # 100*(1+0.05)
-    assert cash2 == pytest.approx(1200.0)              # received 2*100 proceeds
+    assert cash2 == pytest.approx(800.0)               # isolated margin: 1000 - 200 locked
 
 
 def test_extend_short_weighted_avg():
@@ -201,16 +201,39 @@ def test_sell_when_flat_is_none_without_allow_short():
                       Position("BTC/USDT"), cash=0, price=10, equity=1000, risk=RISK) is None
 
 
-def test_cover_clamped_when_cash_short_no_crash():
+
+def test_open_long_locks_margin_not_full_notional():
     from engine.broker import apply_fill
     from engine.models import Order
-    # short 1 @ 100, but only 50 cash and price gapped to 200 -> cover costs ~200 > cash.
-    # must partial-cover (no AssertionError, no negative cash), leaving a residual short.
+    # 5x: opening 5 @ 100 (notional 500) locks only 500/5 = 100 of cash
+    pos2, cash2, _ = apply_fill(Order("buy", 5.0, 100.0), Position("BTC/USDT"), 1000.0,
+                                0.0, 0.0, 0.05, "t", leverage=5.0)
+    assert pos2.qty == pytest.approx(5.0)
+    assert pos2.avg_price == pytest.approx(100.0)
+    assert pos2.leverage == 5.0
+    assert cash2 == pytest.approx(900.0)          # 1000 - 100 margin (not 500)
+
+def test_leveraged_long_roundtrip_pnl_matches_unleveraged():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    # leverage changes margin, not absolute P&L: +10 move on 1 unit = +10 either way
+    pos2, cash2, _ = apply_fill(Order("buy", 1.0, 100.0), Position("BTC/USDT"), 1000.0,
+                                0.0, 0.0, 0.05, "t", leverage=5.0)
+    pos3, cash3, _ = apply_fill(Order("sell", 1.0, 110.0), pos2, cash2,
+                                0.0, 0.0, 0.05, "t2", leverage=5.0)
+    assert pos3.qty == 0.0
+    assert cash3 == pytest.approx(1010.0)         # +10 profit, same as 1x
+
+def test_bad_debt_cover_clamps_cash_to_zero_no_crash():
+    from engine.broker import apply_fill
+    from engine.models import Order
+    # underwater short, price gapped far past liquidation: cover realizes a loss
+    # bigger than released margin -> cash clamps to 0 (bad debt), never negative/crash
     pos = Position("BTC/USDT", qty=-1.0, avg_price=100.0, stop_price=105.0)
-    pos2, cash2, fill = apply_fill(Order("buy", 1.0, 200.0), pos, 50.0, 0.0, 0.0, 0.05, "t")
-    assert fill.qty < 1.0                      # only a partial cover was affordable
-    assert -1.0 < pos2.qty < 0.0               # still short, but smaller
-    assert cash2 >= -1e-6                       # never overspent
+    pos2, cash2, fill = apply_fill(Order("buy", 1.0, 250.0), pos, 10.0, 0.0, 0.0, 0.05, "t")
+    assert fill.qty == pytest.approx(1.0)         # fully covers (margin released)
+    assert pos2.qty == 0.0
+    assert cash2 == 0.0                            # bad-debt clamp, no crash
 
 
 def test_liquidation_price_long():
