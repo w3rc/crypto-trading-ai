@@ -19,6 +19,7 @@ class State:
     positions: dict
     equity_history: list = field(default_factory=list)
     last_funding_ts: str | None = None
+    funding_accrued: float = 0.0
 
 
 def position_value(p, price: float) -> float:
@@ -46,7 +47,8 @@ def load_state(data_dir: str, initial_capital: float, symbols: list[str]) -> Sta
         positions.setdefault(s, Position(s))
     return State(cash=raw["cash"], positions=positions,
                  equity_history=raw.get("equity_history", []),
-                 last_funding_ts=raw.get("last_funding_ts"))
+                 last_funding_ts=raw.get("last_funding_ts"),
+                 funding_accrued=raw.get("funding_accrued", 0.0))
 
 
 def save_state_atomic(state: State, data_dir: str,
@@ -59,6 +61,7 @@ def save_state_atomic(state: State, data_dir: str,
                       for s, p in state.positions.items()},
         "equity_history": state.equity_history,
         "last_funding_ts": state.last_funding_ts,
+        "funding_accrued": state.funding_accrued,
     }
     path = _state_path(data_dir)
     tmp = path + ".tmp"

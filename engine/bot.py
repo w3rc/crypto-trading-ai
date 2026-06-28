@@ -55,6 +55,7 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
             if funding_due and pos.qty != 0:
                 pay = broker.funding_payment(pos, price, cfg.risk.funding_rate)
                 st.cash = max(0.0, st.cash + pay)
+                st.funding_accrued += pay
                 print(f"[{sym}] FUNDING {pay:+.4f}")
             equity = state_mod.equity(st, prices)   # best-effort equity for sizing
 

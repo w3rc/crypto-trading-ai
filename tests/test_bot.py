@@ -246,3 +246,25 @@ def test_funding_off_no_charge_no_timestamp(tmp_path):
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.cash == 5000.0                  # no funding applied
     assert st2.last_funding_ts is None         # not tracked when funding is off
+
+def test_funding_accrues_cumulative(tmp_path):
+    cfg = _cfg(tmp_path)
+    cfg.risk.funding_rate = 0.001
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=150.0, stop_price=1.0)
+    st.last_funding_ts = "2020-01-01T00:00:00+00:00"
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path))
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.funding_accrued == pytest.approx(-0.001 * 1.0 * 159.0)   # long paid -> negative
+
+def test_funding_accrued_stays_zero_when_off(tmp_path):
+    cfg = _cfg(tmp_path)   # funding off (rate defaults 0.0)
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=150.0, stop_price=1.0)
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path))
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.funding_accrued == 0.0
