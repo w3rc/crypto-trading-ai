@@ -174,3 +174,18 @@ def test_normal_leverage_passes_through(tmp_path, monkeypatch):
     p = tmp_path / "c.yaml"
     p.write_text(_risk_yaml("  leverage: 5\n"))
     assert load_config(str(p)).risk.leverage == 5.0   # within bounds -> untouched
+
+
+def test_funding_defaults_off(monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    cfg = load_config("engine/config.yaml")
+    assert cfg.risk.funding_rate == 0.0                 # opt-in: off by default
+    assert cfg.risk.funding_interval_hours == 8.0
+
+def test_funding_explicit(tmp_path, monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(_risk_yaml("  funding_rate: 0.0001\n  funding_interval_hours: 4\n"))
+    cfg = load_config(str(p))
+    assert cfg.risk.funding_rate == 0.0001
+    assert cfg.risk.funding_interval_hours == 4.0
