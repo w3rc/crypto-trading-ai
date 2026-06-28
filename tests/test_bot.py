@@ -217,7 +217,7 @@ def test_funding_charges_long_across_interval(tmp_path):
     bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.cash == pytest.approx(10000.0 - 0.001 * 1.0 * 159.0)   # long paid funding
-    assert st2.last_funding_ts != "2020-01-01T00:00:00+00:00"          # clock advanced
+    assert st2.last_funding_ts is not None and st2.last_funding_ts > "2026-01-01"  # clock advanced to ~now
     assert st2.positions["BTC/USDT"].qty == 1.0                        # position untouched
 
 def test_funding_short_receives(tmp_path):
@@ -233,6 +233,7 @@ def test_funding_short_receives(tmp_path):
     bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
     st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
     assert st2.cash == pytest.approx(10000.0 + 0.001 * 1.0 * 159.0)   # short received funding
+    assert st2.positions["BTC/USDT"].qty == -1.0   # short stayed open (not force-closed)
 
 def test_funding_off_no_charge_no_timestamp(tmp_path):
     cfg = _cfg(tmp_path)   # funding_rate defaults 0.0

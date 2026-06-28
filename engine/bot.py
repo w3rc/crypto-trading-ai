@@ -28,11 +28,12 @@ def run_once(cfg=None, market=None, strategy=None) -> None:
               if cfg.sentiment.enabled else {})
 
         funding_on = cfg.risk.funding_rate != 0
-        now_ms = datetime.fromisoformat(ts).timestamp() * 1000
-        last_ms = (datetime.fromisoformat(st.last_funding_ts).timestamp() * 1000
-                   if st.last_funding_ts else None)
-        funding_due = funding_on and broker.funding_due(
-            last_ms, now_ms, cfg.risk.funding_interval_hours)
+        funding_due = False
+        if funding_on:
+            now_ms = datetime.fromisoformat(ts).timestamp() * 1000
+            last_ms = (datetime.fromisoformat(st.last_funding_ts).timestamp() * 1000
+                       if st.last_funding_ts else None)
+            funding_due = broker.funding_due(last_ms, now_ms, cfg.risk.funding_interval_hours)
 
         for sym in cfg.symbols:
             try:
