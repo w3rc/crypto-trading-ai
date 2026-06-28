@@ -58,7 +58,11 @@ strong negativity and exits on extreme negativity).
 The desktop dashboard shows a **Sentiment** panel — per symbol it renders the blended
 score (Fear/Greed label + gauge), the per-source breakdown (`F&G` / `news` / `reddit` /
 `X`, with `—` for sources without a key), and the active strategy. It reads
-`data/sentiment.json`, which the bot writes each cycle.
+`data/sentiment.json`, which the bot writes each cycle. The dashboard also shows a
+**Status** strip (active strategy, exchange, leverage, shorting, funding rate +
+cumulative funding accrued, and risk limits — read from `data/status.json`), a
+**Trades** table (recent fills), and a **Backtest** chart (strategy vs buy-and-hold
+from `data/backtest_equity.csv`, populated by `python -m engine.backtest`).
 
 Sources (each fail-safe — a missing key or dead API just drops that source):
 
