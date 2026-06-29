@@ -21,11 +21,11 @@ export function accruedLabel(accrued?: number): string {
   return "$0.00";
 }
 
-export type ModeTone = "live" | "shadow" | "paper" | "halted";
+export type ModeTone = "live" | "live-unarmed" | "shadow" | "paper" | "halted";
 
-export function modeBadge(mode?: string, halted?: boolean): { label: string; tone: ModeTone } {
+export function modeBadge(mode?: string, halted?: boolean, armed?: boolean): { label: string; tone: ModeTone } {
   if (halted) return { label: "HALTED", tone: "halted" };
-  if (mode === "live") return { label: "LIVE", tone: "live" };
+  if (mode === "live") return armed ? { label: "LIVE", tone: "live" } : { label: "LIVE · UNARMED", tone: "live-unarmed" };
   if (mode === "shadow") return { label: "SHADOW", tone: "shadow" };
   return { label: "PAPER", tone: "paper" };
 }

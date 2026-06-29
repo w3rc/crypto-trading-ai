@@ -32,15 +32,17 @@ test("accruedLabel", () => {
   expect(accruedLabel(-1.234)).toBe("−$1.23 paid");
 });
 
-test("modeBadge maps mode to tone+label", () => {
-  expect(modeBadge("paper", false)).toEqual({ label: "PAPER", tone: "paper" });
-  expect(modeBadge("shadow", false)).toEqual({ label: "SHADOW", tone: "shadow" });
-  expect(modeBadge("live", false)).toEqual({ label: "LIVE", tone: "live" });
-  expect(modeBadge(undefined, false)).toEqual({ label: "PAPER", tone: "paper" });
+test("modeBadge maps mode+armed to tone+label", () => {
+  expect(modeBadge("paper", false, false)).toEqual({ label: "PAPER", tone: "paper" });
+  expect(modeBadge("shadow", false, false)).toEqual({ label: "SHADOW", tone: "shadow" });
+  expect(modeBadge("live", false, true)).toEqual({ label: "LIVE", tone: "live" });
+  expect(modeBadge("live", false, false)).toEqual({ label: "LIVE · UNARMED", tone: "live-unarmed" });
+  expect(modeBadge(undefined, false, false)).toEqual({ label: "PAPER", tone: "paper" });
 });
 
 test("modeBadge: halted overrides every mode", () => {
-  expect(modeBadge("live", true)).toEqual({ label: "HALTED", tone: "halted" });
-  expect(modeBadge("paper", true)).toEqual({ label: "HALTED", tone: "halted" });
-  expect(modeBadge("shadow", true)).toEqual({ label: "HALTED", tone: "halted" });
+  expect(modeBadge("live", true, true)).toEqual({ label: "HALTED", tone: "halted" });
+  expect(modeBadge("paper", true, false)).toEqual({ label: "HALTED", tone: "halted" });
+  expect(modeBadge("shadow", true, false)).toEqual({ label: "HALTED", tone: "halted" });
+  expect(modeBadge(undefined, true, false)).toEqual({ label: "HALTED", tone: "halted" });
 });
