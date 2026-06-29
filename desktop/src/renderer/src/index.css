@@ -96,3 +96,8 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .seg-btn.active { background: var(--accent); color: #0a0e1a; font-weight: 600; }
 .rail-toggle-hint { color: var(--muted); font-size: 11px; margin-top: 6px; }
 @media (max-width: 820px) { .rail-toggle { margin-top: 0; } }
+.rail-fresh { color: var(--muted); font-size: 11px; margin-top: 6px; }
+.rail-fresh.stale { color: var(--down); font-weight: 600; }
+.brain-chip { font-size: 11px; margin-top: 6px; padding: 2px 8px; border-radius: 6px; display: inline-block; }
+.brain-ok { color: var(--muted); }
+.brain-degraded { color: var(--down); background: rgba(239,68,68,0.12); }
