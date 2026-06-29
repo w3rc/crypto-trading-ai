@@ -1,3 +1,4 @@
+import json
 import os
 from dataclasses import dataclass, field
 from typing import Optional
@@ -68,6 +69,20 @@ class Config:
     exchange_secret: str = field(default="", repr=False)
 
 
+_VALID_MODES = {"paper", "shadow", "live"}
+
+
+def _mode_override(data_dir: str, default: str) -> str:
+    """A valid mode in <data_dir>/control.json overrides the config mode; fail-safe to default."""
+    path = os.path.join(data_dir, "control.json")
+    try:
+        with open(path) as f:
+            m = json.load(f).get("mode")
+    except (OSError, json.JSONDecodeError, ValueError, AttributeError):
+        return default                      # missing / unreadable / bad JSON / non-dict -> config mode
+    return m if m in _VALID_MODES else default
+
+
 def load_config(path: str = "engine/config.yaml") -> Config:
     with open(path) as f:
         raw = yaml.safe_load(f)
@@ -121,7 +136,7 @@ def load_config(path: str = "engine/config.yaml") -> Config:
             sell_max=float(sent_raw.get("sell_max", -0.5)),
             http_timeout=float(sent_raw.get("http_timeout", 6.0)),
         ),
-        mode=raw.get("mode", "paper"),
+        mode=_mode_override(raw["data_dir"], raw.get("mode", "paper")),
         exchange_api_key=os.environ.get(raw.get("exchange_api_key_env", "EXCHANGE_API_KEY"), ""),
         exchange_secret=os.environ.get(raw.get("exchange_secret_env", "EXCHANGE_API_SECRET"), ""),
     )

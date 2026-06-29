@@ -230,3 +230,32 @@ def test_credentials_excluded_from_repr():
     text = repr(cfg)
     assert "SUPERSECRETKEY" not in text
     assert "SUPERSECRETVALUE" not in text
+
+
+def _toggle_yaml(data_dir, mode="paper"):
+    return (
+        "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
+        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\n"
+        f"data_dir: {data_dir}\nmode: {mode}\n"
+        "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
+        "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
+    )
+
+def test_control_json_overrides_mode(tmp_path):
+    (tmp_path / "control.json").write_text('{"mode": "live"}')
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "paper"))
+    assert load_config(str(p)).mode == "live"          # control.json wins over config
+
+def test_control_json_invalid_mode_ignored(tmp_path):
+    (tmp_path / "control.json").write_text('{"mode": "bogus"}')
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "shadow"))
+    assert load_config(str(p)).mode == "shadow"        # invalid -> config mode
+
+def test_control_json_missing_uses_config(tmp_path):
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "shadow"))
+    assert load_config(str(p)).mode == "shadow"        # no control.json -> config mode
+
+def test_control_json_corrupt_ignored(tmp_path):
+    (tmp_path / "control.json").write_text("{not json")
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "paper"))
+    assert load_config(str(p)).mode == "paper"         # corrupt -> config mode
