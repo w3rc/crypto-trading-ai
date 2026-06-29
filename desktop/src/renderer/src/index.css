@@ -50,3 +50,39 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
         background: var(--glass); border: 1px solid var(--glass-border); border-radius: 10px; }
 .chip-k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
 .chip-v { font-size: 14px; font-weight: 600; }
+
+/* --- redesign: rail + mode colors --- */
+:root {
+  --mode-paper: #93a0bd; --mode-shadow: #60a5fa; --mode-live: #f59e0b; --mode-halted: #f87171;
+}
+.app { display: flex; min-height: 100vh; }
+.sidebar { width: 240px; flex: 0 0 240px; height: 100vh; position: sticky; top: 0;
+  display: flex; flex-direction: column; gap: 16px; padding: 22px 18px;
+  border-right: 1px solid var(--glass-border); background: rgba(255,255,255,0.025); }
+.brand { font-size: 17px; font-weight: 700; }
+.mode-badge { display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+  padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; letter-spacing: 0.5px;
+  color: var(--mode-paper); border: 1px solid currentColor; }
+.mode-dot { width: 8px; height: 8px; border-radius: 999px; background: currentColor; }
+.mode-paper { color: var(--mode-paper); }
+.mode-shadow { color: var(--mode-shadow); }
+.mode-live { color: var(--mode-live); }
+.mode-halted { color: var(--mode-halted); background: rgba(248,113,113,0.12); }
+.rail-eq { font-size: 24px; font-weight: 700; }
+.rail-pnl { font-size: 14px; font-weight: 600; margin-top: 2px; }
+.rail-nav { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.rail-link { text-align: left; background: none; border: none; color: var(--muted);
+  font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
+.rail-link:hover { background: var(--glass); color: var(--text); }
+.rail-link.active { background: var(--glass); color: var(--text); font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent); }
+.rail-foot { margin-top: auto; color: var(--muted); font-size: 12px; line-height: 1.6; }
+@media (max-width: 820px) {
+  .app { flex-direction: column; }
+  .sidebar { width: auto; flex: none; height: auto; position: static;
+    flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+    border-right: none; border-bottom: 1px solid var(--glass-border); }
+  .rail-acct { margin-left: auto; text-align: right; }
+  .rail-nav { flex-direction: row; flex-wrap: wrap; margin-top: 0; width: 100%; }
+  .rail-foot { margin-top: 0; width: 100%; }
+}
