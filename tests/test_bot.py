@@ -449,3 +449,26 @@ def test_live_fill_persists_meta_even_if_trade_log_write_fails(tmp_path, monkeyp
     assert len(mk.orders) == 1                                   # real fill was placed
     meta = _json.loads((tmp_path / "live_meta.json").read_text())
     assert meta["BTC/USDT"]["avg_price"] > 0                     # safety-critical sidecar persisted post-fill
+
+
+def test_live_persists_each_fill_to_sidecar(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path, symbols=("BTC/USDT", "ETH/USDT")); cfg.mode = "live"
+    mk = _LiveMarket()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    meta = _json.loads((tmp_path / "live_meta.json").read_text())
+    assert meta["BTC/USDT"]["avg_price"] > 0 and meta["ETH/USDT"]["avg_price"] > 0   # each fill persisted
+
+
+def test_live_halt_midcycle_stops_further_orders(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path, symbols=("BTC/USDT", "ETH/USDT")); cfg.mode = "live"
+    class _HaltOnFirst(_LiveMarket):
+        def create_order(self, ex, sym, side, qty, ref_price, ts):
+            (tmp_path / "HALT").write_text("")                      # kill switch trips during the first order
+            return super().create_order(ex, sym, side, qty, ref_price, ts)
+    mk = _HaltOnFirst()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert len(mk.orders) == 1                                      # only the first symbol traded; HALT stopped the rest
+    status = _json.loads((tmp_path / "status.json").read_text())
+    assert status["halted"] is True

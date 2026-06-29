@@ -262,6 +262,7 @@ def _run_live(cfg, market, strategy) -> None:
 
         meta = state_mod.load_live_meta(cfg.data_dir)
         prices: dict[str, float] = {}
+        halted_mid = False
         for sym in cfg.symbols:
             try:
                 df = market.fetch_ohlcv_df(exchange, sym, cfg.timeframe)
@@ -308,6 +309,16 @@ def _run_live(cfg, market, strategy) -> None:
                 print(f"[LIVE][{sym}] SKIP {order.side} {order.qty:.8f} — below min notional")
                 continue
 
+            if os.path.exists(os.path.join(cfg.data_dir, "HALT")):   # kill switch can fire mid-cycle
+                halted_mid = True
+                state_mod.append_decision(
+                    {"ts": ts, "symbol": sym, "action": order.side,
+                     "reason": "halted (data/HALT) before order", "price": price, "executed": False},
+                    cfg.data_dir)
+                log.warning("data/HALT appeared mid-cycle -> stopping before %s order", sym)
+                print(f"[LIVE][{sym}] HALTED mid-cycle — no further orders")
+                break
+
             try:
                 fill = market.create_order(exchange, sym, order.side, qty, price, ts)
             except Exception as e:                       # rejected/insufficient/down -> skip symbol
@@ -318,22 +329,27 @@ def _run_live(cfg, market, strategy) -> None:
                 print(f"[LIVE][{sym}] ORDER FAILED ({e})")
                 continue
 
-            # fill placed (real money moved): update the safety-critical sidecar FIRST (in-memory,
-            # cannot fail), so a later advisory-log write error can't leave a stale stop price.
+            # fill placed (real money moved): update the safety-critical sidecar and PERSIST it
+            # immediately (per fill), so a later-symbol write failure or a crash cannot lose this
+            # fill's protective stop. Advisory trade/decision logs come after and never abort.
             meta = _update_meta(meta, sym, pos, order.side, fill, cfg.risk.stop_loss_pct)
+            try:
+                state_mod.save_live_meta(meta, cfg.data_dir)
+            except Exception as e:
+                log.error("live: fill placed but sidecar save failed for %s: %s", sym, e)
+                print(f"[LIVE][{sym}] WARNING: fill placed but sidecar save failed: {e}")
             try:
                 state_mod.append_trade(fill, cfg.data_dir)
                 state_mod.append_decision(
                     {"ts": ts, "symbol": sym, "action": order.side, "reason": reason,
                      "price": fill.price, "executed": True}, cfg.data_dir)
-            except Exception as e:                       # fill is real + sidecar already updated; record loudly, don't abort
+            except Exception as e:                       # fill is real + sidecar already persisted; record loudly, don't abort
                 log.error("live: fill placed but trade/decision log write failed for %s: %s", sym, e)
                 print(f"[LIVE][{sym}] WARNING: fill placed but log write failed: {e}")
             print(f"[LIVE][{sym}] {order.side.upper()} {fill.qty:.8f} @ {fill.price:.2f} — {reason}")
 
-        state_mod.save_live_meta(meta, cfg.data_dir)
         _write_live_mirror(cfg, ts, cash, qty_by, meta, prices)
-        _safe_write_status(cfg, ts, halted=False)
+        _safe_write_status(cfg, ts, halted=halted_mid)
 
 
 def _safe_write_status(cfg, ts, halted) -> None:
