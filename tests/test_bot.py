@@ -333,3 +333,142 @@ def test_paper_mode_still_simulates(tmp_path):
     assert st.positions["BTC/USDT"].qty > 0                        # paper path unchanged
     data = _json.loads((tmp_path / "status.json").read_text())
     assert data["mode"] == "paper"                                 # status now carries mode
+
+
+class _LiveMarket:
+    """Fake live market; records create_order calls and returns a closed fill."""
+    def __init__(self, cash=5000.0, qty=None, price=159.0):
+        self.cash, self.qty, self.price = cash, qty or {}, price
+        self.orders = []
+    def make_exchange(self, name, mode="paper", api_key="", secret=""): return object()
+    def fetch_ohlcv_df(self, ex, sym, tf, limit=200): return _df()
+    def fetch_price(self, ex, sym): return self.price
+    def fetch_balance(self, ex, symbols): return self.cash, {s: self.qty.get(s, 0.0) for s in symbols}
+    def clamp_to_market(self, ex, sym, qty, price): return qty
+    def create_order(self, ex, sym, side, qty, ref_price, ts):
+        self.orders.append((sym, side, qty))
+        from engine.models import Fill
+        return Fill(sym, side, qty, ref_price, qty * ref_price * 0.001, ts)
+
+
+def test_live_armed_places_real_order(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    mk = _LiveMarket()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert len(mk.orders) == 1 and mk.orders[0][1] == "buy"       # a REAL order placed
+    rec = _json.loads((tmp_path / "decisions.jsonl").read_text().strip().splitlines()[-1])
+    assert rec["action"] == "buy" and rec["executed"] is True
+    assert (tmp_path / "trades.csv").exists()                     # real fill recorded
+    meta = _json.loads((tmp_path / "live_meta.json").read_text())
+    assert meta["BTC/USDT"]["avg_price"] > 0                      # sidecar updated from fill
+    status = _json.loads((tmp_path / "status.json").read_text())
+    assert status["mode"] == "live" and status["halted"] is False
+
+
+def test_live_unarmed_falls_back_to_shadow(tmp_path, monkeypatch):
+    monkeypatch.delenv("LIVE_TRADING_ARMED", raising=False)
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    mk = _LiveMarket()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert mk.orders == []                                        # NO real order
+    rec = _json.loads((tmp_path / "decisions.jsonl").read_text().strip().splitlines()[-1])
+    assert rec["executed"] is False and rec["reason"].startswith("[shadow]")
+    assert not (tmp_path / "trades.csv").exists()
+
+
+def test_live_halt_file_blocks_execution(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    (tmp_path / "HALT").write_text("")
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    mk = _LiveMarket()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert mk.orders == []                                        # halted before any order
+    assert not (tmp_path / "trades.csv").exists()
+    status = _json.loads((tmp_path / "status.json").read_text())
+    assert status["halted"] is True
+
+
+def test_live_balance_failure_fails_closed(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    class _FailBal(_LiveMarket):
+        def fetch_balance(self, ex, symbols): raise RuntimeError("auth failed")
+    mk = _FailBal()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert mk.orders == []                                        # no balance -> no order
+    assert (tmp_path / "status.json").exists()                    # cycle survived
+
+
+def test_live_below_min_notional_skips(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    class _ClampZero(_LiveMarket):
+        def clamp_to_market(self, ex, sym, qty, price): return 0.0
+    mk = _ClampZero()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert mk.orders == []
+    rec = _json.loads((tmp_path / "decisions.jsonl").read_text().strip().splitlines()[-1])
+    assert rec["executed"] is False and "min notional" in rec["reason"]
+
+
+def test_live_stop_loss_sells_to_flat(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    # seed a held long with a stop ABOVE the current price -> stop fires
+    (tmp_path / "live_meta.json").write_text(
+        _json.dumps({"BTC/USDT": {"avg_price": 200.0, "stop_price": 190.0}}))
+    mk = _LiveMarket(qty={"BTC/USDT": 0.5}, price=159.0)          # price 159 <= stop 190
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="hold")))
+    assert len(mk.orders) == 1 and mk.orders[0] == ("BTC/USDT", "sell", 0.5)
+    meta = _json.loads((tmp_path / "live_meta.json").read_text())
+    assert "BTC/USDT" not in meta                                 # sidecar cleared on close
+
+
+def test_live_balance_failure_halted_is_false(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    class _FailBal(_LiveMarket):
+        def fetch_balance(self, ex, symbols): raise RuntimeError("auth failed")
+    mk = _FailBal()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert mk.orders == []                                        # no balance -> no order
+    assert (tmp_path / "status.json").exists()                    # cycle survived
+    status = _json.loads((tmp_path / "status.json").read_text())
+    assert status["halted"] is False                              # balance failure is NOT a HALT event
+
+
+def test_live_fill_persists_meta_even_if_trade_log_write_fails(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    mk = _LiveMarket()
+    import engine.state as state_mod
+    def _boom(*a, **k): raise OSError("disk full")
+    monkeypatch.setattr(state_mod, "append_trade", _boom)
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert len(mk.orders) == 1                                   # real fill was placed
+    meta = _json.loads((tmp_path / "live_meta.json").read_text())
+    assert meta["BTC/USDT"]["avg_price"] > 0                     # safety-critical sidecar persisted post-fill
+
+
+def test_live_persists_each_fill_to_sidecar(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path, symbols=("BTC/USDT", "ETH/USDT")); cfg.mode = "live"
+    mk = _LiveMarket()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    meta = _json.loads((tmp_path / "live_meta.json").read_text())
+    assert meta["BTC/USDT"]["avg_price"] > 0 and meta["ETH/USDT"]["avg_price"] > 0   # each fill persisted
+
+
+def test_live_halt_midcycle_stops_further_orders(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path, symbols=("BTC/USDT", "ETH/USDT")); cfg.mode = "live"
+    class _HaltOnFirst(_LiveMarket):
+        def create_order(self, ex, sym, side, qty, ref_price, ts):
+            (tmp_path / "HALT").write_text("")                      # kill switch trips during the first order
+            return super().create_order(ex, sym, side, qty, ref_price, ts)
+    mk = _HaltOnFirst()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert len(mk.orders) == 1                                      # only the first symbol traded; HALT stopped the rest
+    status = _json.loads((tmp_path / "status.json").read_text())
+    assert status["halted"] is True

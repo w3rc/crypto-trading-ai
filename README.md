@@ -120,6 +120,24 @@ dashboard's Status strip shows `MODE: SHADOW`. This is the dry-run stage before 
 `paper` (simulated) -> `shadow` (real reads, zero execution) -> live (slice 2). `create_order` does
 not exist in the codebase yet - shadow cannot trade.
 
+## Live execution (real orders)
+
+Set `mode: live` **and** export `LIVE_TRADING_ARMED=yes` to place **real spot market orders**
+(long-only). Both switches are required — `mode: live` alone (or a stale committed config) falls
+back to shadow and places nothing. Use a **trade-enabled, withdrawal-disabled** API key in `.env`
+(`EXCHANGE_API_KEY` / `EXCHANGE_API_SECRET`).
+
+The exchange is the source of truth: each cycle re-reads your real cash + balances, so a crash, a
+partial fill, or a manual trade never desyncs the bot. Entry price and stop-loss (which the exchange
+doesn't store) live in `data/live_meta.json`; `data/state.json` is a read-only mirror for the
+dashboard. Orders are sized by the same risk gate as paper, rounded to the exchange's precision, and
+skipped if below its minimum notional.
+
+**Kill switch:** `touch data/HALT` stops all execution instantly (the dashboard shows `HALTED`);
+`rm data/HALT` resumes. Progression: `paper` (simulated) → `shadow` (real reads, zero execution) →
+`live` (real orders). `create_order` exists in exactly one place (`market.create_order`), reachable
+only when live, armed, and not halted.
+
 ## Tests
 ```bash
 python -m pytest -q
