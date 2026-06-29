@@ -85,3 +85,5 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
   .rail-nav { flex-direction: row; flex-wrap: wrap; margin-top: 0; width: 100%; }
   .rail-foot { margin-top: 0; width: 100%; }
 }
+.exec-yes { color: var(--up); font-weight: 600; }
+.exec-no { color: var(--muted); }
