@@ -55,14 +55,14 @@ symbol, fed into both the LLM brain (it appears in the prompt) and the determini
 `sentiment_rule` strategy (which gates the indicator signals — it won't buy into
 strong negativity and exits on extreme negativity).
 
-The desktop dashboard shows a **Sentiment** panel — per symbol it renders the blended
-score (Fear/Greed label + gauge), the per-source breakdown (`F&G` / `news` / `reddit` /
-`X`, with `—` for sources without a key), and the active strategy. It reads
-`data/sentiment.json`, which the bot writes each cycle. The dashboard also shows a
-**Status** strip (active strategy, exchange, leverage, shorting, funding rate +
-cumulative funding accrued, and risk limits — read from `data/status.json`), a
-**Trades** table (recent fills), and a **Backtest** chart (strategy vs buy-and-hold
-from `data/backtest_equity.csv`, populated by `python -m engine.backtest`).
+The desktop dashboard is organized as a **nav sidebar + section views**. The sidebar pins the
+bot's **mode** (color-coded — PAPER / SHADOW / LIVE, and a red **HALTED** when `data/HALT` is
+present) plus live equity and P&L, so the safety-critical state is always visible. The nav switches
+between **Overview** (account, equity curve, open positions, risk limits), **Positions**,
+**Activity** (decisions + trades), **Sentiment**, and **Backtest** (strategy vs buy-and-hold from
+`data/backtest_equity.csv`). It reads the same `data/*.json` snapshots the bot writes each cycle.
+
+The **Sentiment** view renders per symbol: the blended score (Fear/Greed label + gauge), the per-source breakdown (`F&G` / `news` / `reddit` / `X`, with `—` for sources without a key), and the active strategy. It reads `data/sentiment.json`, which the bot writes each cycle.
 
 Sources (each fail-safe — a missing key or dead API just drops that source):
 
