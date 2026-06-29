@@ -1,7 +1,10 @@
 import ccxt
+import logging
 import pandas as pd
 
 from engine.models import Fill
+
+log = logging.getLogger("market")
 
 
 _DERIVATIVE_TYPES = {"swap", "future", "margin", "delivery"}
@@ -61,8 +64,8 @@ def create_order(exchange, symbol: str, side: str, qty: float, ref_price: float,
         try:
             o = exchange.fetch_order(o.get("id"), symbol) or o
             filled = float(o.get("filled") or filled or 0.0)
-        except Exception:
-            pass
+        except Exception as e:
+            log.warning("create_order: fetch_order re-poll failed for %s: %s", o.get("id"), e)
     avg = float(o.get("average") or o.get("price") or ref_price)
     fee = float((o.get("fee") or {}).get("cost") or 0.0)
     return Fill(symbol, side, filled, avg, fee, ts)

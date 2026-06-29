@@ -68,8 +68,8 @@ def test_make_exchange_live_loads_credentials():
 class _FilledExchange:
     def __init__(self):
         self.calls = []
-    def create_order(self, symbol, type, side, amount):
-        self.calls.append((symbol, type, side, amount))
+    def create_order(self, symbol, order_type, side, amount):
+        self.calls.append((symbol, order_type, side, amount))
         return {"id": "1", "status": "closed", "filled": amount,
                 "average": 64010.0, "fee": {"cost": 0.64, "currency": "USDT"}}
 
@@ -85,19 +85,39 @@ def test_create_order_reconciles_filled_market_order():
 
 class _AsyncExchange:
     """Returns 'open' with no fill detail, then a closed order on fetch_order."""
-    def create_order(self, symbol, type, side, amount):
+    def __init__(self):
+        self.fetch_calls = []
+    def create_order(self, symbol, order_type, side, amount):
         return {"id": "9", "status": "open", "filled": 0.0}
     def fetch_order(self, oid, symbol):
+        self.fetch_calls.append((oid, symbol))
         return {"id": oid, "status": "closed", "filled": 0.02, "average": 159.5, "fee": {"cost": 0.16}}
 
 
 def test_create_order_repolls_when_not_filled():
-    fill = market.create_order(_AsyncExchange(), "SOL/USDT", "buy", 0.02, 159.0, "T")
+    ex = _AsyncExchange()
+    fill = market.create_order(ex, "SOL/USDT", "buy", 0.02, 159.0, "T")
     assert fill.qty == 0.02 and fill.price == 159.5 and fill.fee == 0.16
+    assert ex.fetch_calls == [("9", "SOL/USDT")]
+
+
+class _ErrorRepollExchange:
+    def create_order(self, symbol, order_type, side, amount):
+        return {"id": "7", "status": "open", "filled": 0.0}
+    def fetch_order(self, oid, symbol):
+        raise RuntimeError("429 rate limit")
+
+
+def test_create_order_repoll_failure_falls_back(caplog):
+    import logging
+    with caplog.at_level(logging.WARNING):
+        fill = market.create_order(_ErrorRepollExchange(), "BTC/USDT", "buy", 0.01, 64000.0, "T")
+    assert fill.qty == 0.0 and fill.price == 64000.0 and fill.fee == 0.0   # falls back to original o + ref_price
+    assert "re-poll failed" in caplog.text                                  # failure is observable
 
 
 class _NoAvgExchange:
-    def create_order(self, symbol, type, side, amount):
+    def create_order(self, symbol, order_type, side, amount):
         return {"id": "2", "status": "closed", "filled": amount}   # no average, no fee
 
 
