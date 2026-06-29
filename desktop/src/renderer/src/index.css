@@ -101,3 +101,4 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .brain-chip { font-size: 11px; margin-top: 6px; padding: 2px 8px; border-radius: 6px; display: inline-block; }
 .brain-ok { color: var(--muted); }
 .brain-degraded { color: var(--down); background: rgba(239,68,68,0.12); }
+.dup-count { color: var(--accent); font-weight: 600; }
