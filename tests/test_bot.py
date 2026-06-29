@@ -423,3 +423,29 @@ def test_live_stop_loss_sells_to_flat(tmp_path, monkeypatch):
     assert len(mk.orders) == 1 and mk.orders[0] == ("BTC/USDT", "sell", 0.5)
     meta = _json.loads((tmp_path / "live_meta.json").read_text())
     assert "BTC/USDT" not in meta                                 # sidecar cleared on close
+
+
+def test_live_balance_failure_halted_is_false(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    class _FailBal(_LiveMarket):
+        def fetch_balance(self, ex, symbols): raise RuntimeError("auth failed")
+    mk = _FailBal()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert mk.orders == []                                        # no balance -> no order
+    assert (tmp_path / "status.json").exists()                    # cycle survived
+    status = _json.loads((tmp_path / "status.json").read_text())
+    assert status["halted"] is False                              # balance failure is NOT a HALT event
+
+
+def test_live_fill_persists_meta_even_if_trade_log_write_fails(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    mk = _LiveMarket()
+    import engine.state as state_mod
+    def _boom(*a, **k): raise OSError("disk full")
+    monkeypatch.setattr(state_mod, "append_trade", _boom)
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert len(mk.orders) == 1                                   # real fill was placed
+    meta = _json.loads((tmp_path / "live_meta.json").read_text())
+    assert meta["BTC/USDT"]["avg_price"] > 0                     # safety-critical sidecar persisted post-fill
