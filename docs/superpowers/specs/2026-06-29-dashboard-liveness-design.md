@@ -22,7 +22,7 @@ The engine is a one-shot run by an **external cron**, so neither side knows the 
   - age from `status.ts` (ISO) vs `nowMs`; `label` = `"updated 8s ago"` / `"4m ago"` / `"2h ago"`.
   - `stale = ageSec > 2.5 × interval` (interval from status, **fallback 900** if absent).
   - The existing **5 s poll** already re-runs every render, so age keeps growing against `Date.now()` even when the file is static → a stopped bot crosses the threshold and flips to STALE on its own. No extra timer.
-- **Sidebar:** a freshness line under the mode badge — `"updated 8s ago"` normally; when `stale`, a distinct **`STALE · bot stopped?`** treatment. When `status` is entirely absent → `"no data · is the bot running?"`.
+- **Sidebar:** a freshness line under the mode badge — `"updated 8s ago"` normally; when `stale`, a distinct **`STALE · updated Xm ago`** treatment (a stopped bot). When `status` is entirely absent → `"no data · is the bot running?"`.
 
 ### A2 — Brain health, client-side derive (no engine change)
 The engine already encodes the signal: a degraded cycle writes `reason = "llm-fallback: …"` (`engine/llm.py:74-75`). The dashboard derives it:
@@ -54,7 +54,7 @@ The engine already encodes the signal: a degraded cycle writes `reason = "llm-fa
 - **vitest (`src/lib`):** `freshness` (fresh→label+!stale; just-past-2.5×→stale; missing status→absent; missing interval→900 fallback); `brainHealth` (latest fallback→degraded+count; latest ok→ok; empty→unknown).
 - **pytest:** `interval_seconds` defaults to 900 and is overridden from yaml; `_status_payload` carries it.
 - **build:** `npm run build` exit 0.
-- **Playwright (controller, 1280/768/375):** fresh bot → "updated Xs ago" + Brain OK; stale `status.ts` → `STALE · bot stopped?`; degraded decisions → Brain DEGRADED + collapsed `×N` row; missing status → "no data" line.
+- **Playwright (controller, 1280/768/375):** fresh bot → "updated Xs ago" + Brain OK; stale `status.ts` → `STALE · updated Xm ago`; degraded decisions → Brain DEGRADED + collapsed `×N` row; missing status → "no data" line.
 
 ## Out of scope (later batches)
 Packaged data-dir fix (C1), single-instance (C2), `.env` autoload + sentiment-in-all-modes + cron (B-track), CI (C9). This batch is liveness only.

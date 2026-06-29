@@ -10,6 +10,7 @@ function collapse(items: Decision[]): Row[] {
     const prev = out[out.length - 1];
     if (prev && !prev.executed && !d.executed && prev.reason === d.reason) {
       prev.count += 1;
+      prev.ts = d.ts; prev.symbol = d.symbol; prev.price = d.price;   // show the most-recent occurrence
     } else {
       out.push({ ...d, count: 1 });
     }
