@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 
 const api = {
   getSnapshot: () => ipcRenderer.invoke("snapshot"),
+  setMode: (mode: string) => ipcRenderer.invoke("set-mode", mode),
 };
 
 if (process.contextIsolated) {

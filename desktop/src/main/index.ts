@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { join } from "path";
 import { is } from "@electron-toolkit/utils";
 import { readSnapshot, dataDir } from "../lib/snapshot";
+import { writeControl } from "../lib/control";
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -27,6 +28,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   ipcMain.handle("snapshot", () => readSnapshot(dataDir()));
+  ipcMain.handle("set-mode", (_e, mode: string) => writeControl(dataDir(), mode));
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
