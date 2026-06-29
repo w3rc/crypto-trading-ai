@@ -1,4 +1,5 @@
 from engine.market import fetch_ohlcv_df, fetch_price
+from engine.models import Fill
 
 class FakeExchange:
     def fetch_ohlcv(self, symbol, timeframe, limit):
@@ -57,3 +58,49 @@ def test_fetch_balance_maps_quote_and_base():
     assert cash == 5000.0                        # free USDT (shared quote)
     assert qty["BTC/USDT"] == 0.25
     assert qty["ETH/USDT"] == 0.0                # no ETH balance -> 0.0
+
+
+def test_make_exchange_live_loads_credentials():
+    ex = market.make_exchange("binance", "live", "LKEY", "LSEC")
+    assert ex.apiKey == "LKEY" and ex.secret == "LSEC"
+
+
+class _FilledExchange:
+    def __init__(self):
+        self.calls = []
+    def create_order(self, symbol, type, side, amount):
+        self.calls.append((symbol, type, side, amount))
+        return {"id": "1", "status": "closed", "filled": amount,
+                "average": 64010.0, "fee": {"cost": 0.64, "currency": "USDT"}}
+
+
+def test_create_order_reconciles_filled_market_order():
+    ex = _FilledExchange()
+    fill = market.create_order(ex, "BTC/USDT", "buy", 0.01, 64000.0, "T")
+    assert ex.calls == [("BTC/USDT", "market", "buy", 0.01)]   # real MARKET order
+    assert isinstance(fill, Fill)
+    assert fill.qty == 0.01 and fill.price == 64010.0 and fill.fee == 0.64
+    assert fill.symbol == "BTC/USDT" and fill.side == "buy" and fill.ts == "T"
+
+
+class _AsyncExchange:
+    """Returns 'open' with no fill detail, then a closed order on fetch_order."""
+    def create_order(self, symbol, type, side, amount):
+        return {"id": "9", "status": "open", "filled": 0.0}
+    def fetch_order(self, oid, symbol):
+        return {"id": oid, "status": "closed", "filled": 0.02, "average": 159.5, "fee": {"cost": 0.16}}
+
+
+def test_create_order_repolls_when_not_filled():
+    fill = market.create_order(_AsyncExchange(), "SOL/USDT", "buy", 0.02, 159.0, "T")
+    assert fill.qty == 0.02 and fill.price == 159.5 and fill.fee == 0.16
+
+
+class _NoAvgExchange:
+    def create_order(self, symbol, type, side, amount):
+        return {"id": "2", "status": "closed", "filled": amount}   # no average, no fee
+
+
+def test_create_order_falls_back_to_ref_price_and_zero_fee():
+    fill = market.create_order(_NoAvgExchange(), "BTC/USDT", "sell", 0.01, 63000.0, "T")
+    assert fill.price == 63000.0 and fill.fee == 0.0   # ref_price fallback, fee defaults 0
