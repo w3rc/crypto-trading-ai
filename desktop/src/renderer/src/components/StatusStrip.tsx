@@ -6,6 +6,7 @@ export default function StatusStrip({ status }: { status: Status | null }) {
   const r = status.risk;
   const chips: [string, string][] = [
     ["Mode", (status.mode ?? "paper").toUpperCase()],
+    ...(status.halted ? [["Halted", "YES"] as [string, string]] : []),
     ["Strategy", status.strategy],
     ["Exchange", status.exchange],
     ["Leverage", leverageMode(r.leverage)],
