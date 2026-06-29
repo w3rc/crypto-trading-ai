@@ -65,6 +65,7 @@ class Config:
     rules: RulesConfig = field(default_factory=RulesConfig)
     sentiment: SentimentConfig = field(default_factory=SentimentConfig)
     mode: str = "paper"
+    interval_seconds: int = 900
     exchange_api_key: str = field(default="", repr=False)
     exchange_secret: str = field(default="", repr=False)
 
@@ -137,6 +138,7 @@ def load_config(path: str = "engine/config.yaml") -> Config:
             http_timeout=float(sent_raw.get("http_timeout", 6.0)),
         ),
         mode=_mode_override(raw["data_dir"], raw.get("mode", "paper")),
+        interval_seconds=int(raw.get("interval_seconds", 900)),
         exchange_api_key=os.environ.get(raw.get("exchange_api_key_env", "EXCHANGE_API_KEY"), ""),
         exchange_secret=os.environ.get(raw.get("exchange_secret_env", "EXCHANGE_API_SECRET"), ""),
     )

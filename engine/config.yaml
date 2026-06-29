@@ -9,6 +9,7 @@ mode: paper                       # paper (simulated) | shadow (real read-only) 
 # Live also requires env LIVE_TRADING_ARMED=yes (second switch); touch data/HALT to stop instantly.
 # exchange_api_key_env: EXCHANGE_API_KEY      # env var holding a READ-ONLY exchange key (shadow)
 # exchange_secret_env: EXCHANGE_API_SECRET
+interval_seconds: 900  # seconds between cron cycles; the dashboard flags STALE past ~2.5x this
 risk:
   max_position_pct: 0.25
   stop_loss_pct: 0.05
