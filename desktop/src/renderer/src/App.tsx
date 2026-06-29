@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
-import type { Snapshot } from "../../lib/parse";
+import type { Snapshot, Status } from "../../lib/parse";
+import { leverageMode, shortingLabel, fundingSummary } from "../../lib/status";
 import EquityChart from "./components/EquityChart";
 import PositionsTable from "./components/PositionsTable";
 import DecisionLog from "./components/DecisionLog";
 import TradesTable from "./components/TradesTable";
 import SentimentPanel from "./components/SentimentPanel";
 import BacktestChart from "./components/BacktestChart";
-import StatusStrip from "./components/StatusStrip";
+import Sidebar, { type View } from "./components/Sidebar";
 
 const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [] };
 const api = (window as unknown as { api: { getSnapshot: () => Promise<Snapshot> } }).api;
 
 export default function App(): React.JSX.Element {
   const [snap, setSnap] = useState<Snapshot>(EMPTY);
+  const [view, setView] = useState<View>("overview");
 
   useEffect(() => {
     let alive = true;
@@ -29,66 +31,78 @@ export default function App(): React.JSX.Element {
     return () => { alive = false; clearInterval(id); };
   }, []);
 
+  return (
+    <div className="app">
+      <Sidebar status={snap.status} state={snap.state} view={view} onNavigate={setView} />
+      <main className="main">
+        {view === "overview" && <Overview snap={snap} />}
+        {view === "positions" && (
+          <section className="card"><h2>Open positions</h2><PositionsTable state={snap.state} /></section>
+        )}
+        {view === "activity" && <Activity snap={snap} />}
+        {view === "sentiment" && (
+          <section className="card"><h2>Sentiment</h2><SentimentPanel sentiment={snap.sentiment} /></section>
+        )}
+        {view === "backtest" && (
+          <section className="card"><h2>Backtest</h2><BacktestChart points={snap.backtest} /></section>
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Overview({ snap }: { snap: Snapshot }): React.JSX.Element {
   const cash = snap.state?.cash ?? 0;
   const eq = snap.state?.equity_history;
   const equity = eq && eq.length ? eq[eq.length - 1].equity : cash;
-  const start = eq && eq.length ? eq[0].equity : 10000; // baseline = first recorded equity
+  const start = eq && eq.length ? eq[0].equity : equity;
   const pnl = equity - start;
-
   return (
-    <main className="wrap">
-      <div className="title">Crypto Paper-Trading Bot</div>
-      <div className="sub">Read-only · polls every 5s · {snap.trades.length} trades logged</div>
-
-      <div className="grid">
-        <div className="card span2">
-          <h2>Status</h2>
-          <StatusStrip status={snap.status} />
-        </div>
-
-        <div className="card span2">
-          <h2>Account</h2>
-          <div className="kpis">
-            <div className="kpi"><div className="label">Equity</div><div className="value">${equity.toFixed(2)}</div></div>
-            <div className="kpi"><div className="label">Cash</div><div className="value">${cash.toFixed(2)}</div></div>
-            <div className="kpi"><div className="label">P&amp;L</div>
-              <div className="value" style={{ color: pnl >= 0 ? "var(--up)" : "var(--down)" }}>
-                {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
-              </div>
+    <div className="grid">
+      <section className="card">
+        <h2>Account</h2>
+        <div className="kpis">
+          <div className="kpi"><div className="label">Equity</div><div className="value">${equity.toFixed(2)}</div></div>
+          <div className="kpi"><div className="label">Cash</div><div className="value">${cash.toFixed(2)}</div></div>
+          <div className="kpi"><div className="label">P&amp;L</div>
+            <div className="value" style={{ color: pnl >= 0 ? "var(--up)" : "var(--down)" }}>
+              {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
             </div>
           </div>
         </div>
+      </section>
+      <section className="card"><h2>Equity curve</h2><EquityChart history={eq ?? []} /></section>
+      <section className="card"><h2>Open positions</h2><PositionsTable state={snap.state} /></section>
+      <section className="card"><h2>Risk</h2><RiskCard status={snap.status} /></section>
+    </div>
+  );
+}
 
-        <div className="card span2">
-          <h2>Equity curve</h2>
-          <EquityChart history={eq ?? []} />
-        </div>
+function RiskCard({ status }: { status: Status | null }): React.JSX.Element {
+  if (!status) return <div className="empty">No status yet.</div>;
+  const r = status.risk;
+  const chips: [string, string][] = [
+    ["Leverage", leverageMode(r.leverage)],
+    ["Shorting", shortingLabel(r.allow_short)],
+    ["Funding", fundingSummary(status)],
+    ["Max position", `${(r.max_position_pct * 100).toFixed(0)}%`],
+    ["Stop", `${(r.stop_loss_pct * 100).toFixed(0)}%`],
+    ["Maint. margin", `${(r.maintenance_margin_pct * 100).toFixed(2)}%`],
+  ];
+  return (
+    <div className="chips">
+      {chips.map(([k, v]) => (
+        <div className="chip" key={k}><span className="chip-k">{k}</span><span className="chip-v">{v}</span></div>
+      ))}
+    </div>
+  );
+}
 
-        <div className="card">
-          <h2>Open positions</h2>
-          <PositionsTable state={snap.state} />
-        </div>
-
-        <div className="card">
-          <h2>Decisions <span className="muted" style={{ textTransform: "none", letterSpacing: 0 }}>(* = not executed)</span></h2>
-          <DecisionLog decisions={snap.decisions} />
-        </div>
-
-        <div className="card">
-          <h2>Trades</h2>
-          <TradesTable trades={snap.trades} />
-        </div>
-
-        <div className="card span2">
-          <h2>Sentiment</h2>
-          <SentimentPanel sentiment={snap.sentiment} />
-        </div>
-
-        <div className="card span2">
-          <h2>Backtest</h2>
-          <BacktestChart points={snap.backtest} />
-        </div>
-      </div>
-    </main>
+function Activity({ snap }: { snap: Snapshot }): React.JSX.Element {
+  return (
+    <div className="grid">
+      <section className="card"><h2>Decisions</h2><DecisionLog decisions={snap.decisions} /></section>
+      <section className="card"><h2>Trades</h2><TradesTable trades={snap.trades} /></section>
+    </div>
   );
 }
