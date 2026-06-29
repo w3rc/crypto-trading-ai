@@ -69,3 +69,30 @@ def create_order(exchange, symbol: str, side: str, qty: float, ref_price: float,
     avg = float(o.get("average") or o.get("price") or ref_price)
     fee = float((o.get("fee") or {}).get("cost") or 0.0)
     return Fill(symbol, side, filled, avg, fee, ts)
+
+
+def clamp_to_market(exchange, symbol: str, qty: float, price: float) -> float:
+    """Round qty to the market's amount precision; 0.0 if below min amount/cost.
+
+    Pass qty through unchanged when the exchange exposes no usable limits
+    (ponytail: best-effort — the gate already bounds qty; a real venue has limits).
+    """
+    try:
+        markets = getattr(exchange, "markets", None) or exchange.load_markets()
+    except Exception:
+        return qty
+    m = (markets or {}).get(symbol)
+    if not m:
+        return qty
+    try:
+        adj = float(exchange.amount_to_precision(symbol, qty))
+    except Exception:
+        adj = qty
+    limits = m.get("limits") or {}
+    min_amt = (limits.get("amount") or {}).get("min")
+    min_cost = (limits.get("cost") or {}).get("min")
+    if min_amt is not None and adj < min_amt:
+        return 0.0
+    if min_cost is not None and adj * price < min_cost:
+        return 0.0
+    return adj

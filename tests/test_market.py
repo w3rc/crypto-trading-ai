@@ -124,3 +124,29 @@ class _NoAvgExchange:
 def test_create_order_falls_back_to_ref_price_and_zero_fee():
     fill = market.create_order(_NoAvgExchange(), "BTC/USDT", "sell", 0.01, 63000.0, "T")
     assert fill.price == 63000.0 and fill.fee == 0.0   # ref_price fallback, fee defaults 0
+
+
+class _LimitsExchange:
+    markets = {"BTC/USDT": {"limits": {"amount": {"min": 0.001}, "cost": {"min": 10.0}}}}
+    def amount_to_precision(self, symbol, qty):
+        return f"{qty:.4f}"                       # 4-dp precision
+
+
+def test_clamp_rounds_to_precision():
+    assert market.clamp_to_market(_LimitsExchange(), "BTC/USDT", 0.0123456, 64000.0) == 0.0123
+
+
+def test_clamp_below_min_amount_returns_zero():
+    assert market.clamp_to_market(_LimitsExchange(), "BTC/USDT", 0.0005, 64000.0) == 0.0
+
+
+def test_clamp_below_min_cost_returns_zero():
+    # 0.0001 BTC * 64000 = 6.4 < 10.0 min cost
+    assert market.clamp_to_market(_LimitsExchange(), "BTC/USDT", 0.0001, 64000.0) == 0.0
+
+
+def test_clamp_unknown_market_passes_through():
+    class _Bare:
+        markets = {}
+        def load_markets(self): return {}
+    assert market.clamp_to_market(_Bare(), "BTC/USDT", 0.5, 100.0) == 0.5
