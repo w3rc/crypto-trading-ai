@@ -18,6 +18,7 @@ def _status_payload(cfg, ts, funding_accrued, last_funding_ts, halted=False):
         "ts": ts,
         "mode": cfg.mode,
         "halted": halted,
+        "armed": _live_armed(),
         "strategy": cfg.strategy,
         "exchange": cfg.exchange,
         "risk": {

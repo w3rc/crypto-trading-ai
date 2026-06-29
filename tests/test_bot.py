@@ -472,3 +472,18 @@ def test_live_halt_midcycle_stops_further_orders(tmp_path, monkeypatch):
     assert len(mk.orders) == 1                                      # only the first symbol traded; HALT stopped the rest
     status = _json.loads((tmp_path / "status.json").read_text())
     assert status["halted"] is True
+
+
+def test_status_carries_armed_true(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path)                                  # paper mode
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
+    data = _json.loads((tmp_path / "status.json").read_text())
+    assert data["armed"] is True
+
+def test_status_carries_armed_false(tmp_path, monkeypatch):
+    monkeypatch.delenv("LIVE_TRADING_ARMED", raising=False)
+    cfg = _cfg(tmp_path)
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
+    data = _json.loads((tmp_path / "status.json").read_text())
+    assert data["armed"] is False
