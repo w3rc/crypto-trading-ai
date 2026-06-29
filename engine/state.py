@@ -100,7 +100,7 @@ def load_live_meta(data_dir: str) -> dict:
     try:
         with open(path) as f:
             return json.load(f)
-    except (json.JSONDecodeError, OSError):     # corrupt sidecar -> rebuild from fills next entry
+    except (json.JSONDecodeError, OSError, ValueError):     # corrupt sidecar -> rebuild from fills next entry
         return {}
 
 
