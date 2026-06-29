@@ -57,7 +57,10 @@ strong negativity and exits on extreme negativity).
 
 The desktop dashboard is organized as a **nav sidebar + section views**. The sidebar pins the
 bot's **mode** (color-coded — PAPER / SHADOW / LIVE, and a red **HALTED** when `data/HALT` is
-present) plus live equity and P&L, so the safety-critical state is always visible. The nav switches
+present) plus live equity and P&L, so the safety-critical state is always visible. The sidebar also has a **mode toggle** (Paper / Shadow / Live) that writes `data/control.json`, which
+the engine reads as a mode override on its next cycle (switching to **Live** asks for confirmation).
+Live still requires `LIVE_TRADING_ARMED=yes` in the bot's env to place real orders — the toggle alone
+runs **shadow** when unarmed, shown as `LIVE · UNARMED` in the rail. The nav switches
 between **Overview** (account, equity curve, open positions, risk limits), **Positions**,
 **Activity** (decisions + trades), **Sentiment**, and **Backtest** (strategy vs buy-and-hold from
 `data/backtest_equity.csv`). It reads the same `data/*.json` snapshots the bot writes each cycle.
