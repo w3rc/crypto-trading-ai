@@ -512,3 +512,10 @@ def test_live_via_control_json_unarmed_routes_to_shadow(tmp_path, monkeypatch):
     # and mk.orders would be non-empty. Because the env is absent, the bot routes to
     # _run_shadow, which never calls create_order. Removing the monkeypatch.delenv makes this fail.
     assert mk.orders == []
+
+
+def test_status_carries_interval_seconds(tmp_path):
+    cfg = _cfg(tmp_path)                                   # Config default interval_seconds == 900
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
+    data = _json.loads((tmp_path / "status.json").read_text())
+    assert data["interval_seconds"] == 900

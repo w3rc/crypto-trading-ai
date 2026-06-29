@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import type { State, Status } from "../../../lib/parse";
-import { modeBadge } from "../../../lib/status";
+import type { State, Status, Decision } from "../../../lib/parse";
+import { modeBadge, freshness, brainHealth } from "../../../lib/status";
 
 export type View = "overview" | "positions" | "activity" | "sentiment" | "backtest";
 
@@ -20,13 +20,16 @@ const MODES: { id: string; label: string }[] = [
 
 const api = (window as unknown as { api: { setMode?: (m: string) => Promise<void> } }).api;
 
-export default function Sidebar({ status, state, view, onNavigate }: {
+export default function Sidebar({ status, state, view, onNavigate, decisions }: {
   status: Status | null;
   state: State | null;
   view: View;
   onNavigate: (v: View) => void;
+  decisions: Decision[];
 }) {
   const badge = modeBadge(status?.mode, status?.halted, status?.armed);
+  const fresh = freshness(status, Date.now());   // re-evaluated on every 5s poll re-render
+  const brain = brainHealth(decisions);
   const cash = state?.cash ?? 0;
   const eq = state?.equity_history;
   const equity = eq && eq.length ? eq[eq.length - 1].equity : cash;
@@ -58,6 +61,16 @@ export default function Sidebar({ status, state, view, onNavigate }: {
         <span className="mode-dot" />
         {badge.label}
       </div>
+
+      <div className={`rail-fresh${fresh.stale ? " stale" : ""}`}>
+        {fresh.stale && fresh.ageSec !== null ? `STALE · ${fresh.label}` : fresh.label}
+      </div>
+
+      {brain.state !== "unknown" && (
+        <div className={`brain-chip brain-${brain.state}`}>
+          {brain.state === "ok" ? "Brain OK" : `Brain DEGRADED${brain.count > 1 ? ` · ${brain.count} cycles` : ""}`}
+        </div>
+      )}
 
       <div className="rail-acct">
         <div className="rail-eq">${equity.toFixed(2)}</div>

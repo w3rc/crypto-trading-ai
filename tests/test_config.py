@@ -266,3 +266,11 @@ def test_control_json_non_dict_ignored(tmp_path):
     (tmp_path / "control.json").write_text("123")
     p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "shadow"))
     assert load_config(str(p)).mode == "shadow"        # non-dict -> AttributeError branch -> config mode
+
+def test_interval_seconds_defaults_to_900(tmp_path):
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "paper"))
+    assert load_config(str(p)).interval_seconds == 900     # absent -> default
+
+def test_interval_seconds_from_yaml(tmp_path):
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "paper") + "interval_seconds: 300\n")
+    assert load_config(str(p)).interval_seconds == 300     # yaml value wins

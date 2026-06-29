@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { leverageMode, shortingLabel, fundingSummary, accruedLabel, modeBadge } from "./status";
+import { leverageMode, shortingLabel, fundingSummary, accruedLabel, modeBadge, freshness, brainHealth } from "./status";
 import type { Status } from "./parse";
 
 const mk = (over: Partial<Status["risk"]>): Status => ({
@@ -45,4 +45,56 @@ test("modeBadge: halted overrides every mode", () => {
   expect(modeBadge("paper", true, false)).toEqual({ label: "HALTED", tone: "halted" });
   expect(modeBadge("shadow", true, false)).toEqual({ label: "HALTED", tone: "halted" });
   expect(modeBadge(undefined, true, false)).toEqual({ label: "HALTED", tone: "halted" });
+});
+
+test("freshness: fresh status -> ago label, not stale", () => {
+  const now = 1_000_000_000_000;
+  const status = { ts: new Date(now - 8_000).toISOString(), interval_seconds: 900 } as any;
+  const f = freshness(status, now);
+  expect(f.stale).toBe(false);
+  expect(f.ageSec).toBe(8);
+  expect(f.label).toBe("updated 8s ago");
+});
+
+test("freshness: past 2.5x interval -> stale", () => {
+  const now = 1_000_000_000_000;
+  const status = { ts: new Date(now - 2_300_000).toISOString(), interval_seconds: 900 } as any; // 2300s > 2250s
+  expect(freshness(status, now).stale).toBe(true);
+});
+
+test("freshness: missing interval -> 900s fallback", () => {
+  const now = 1_000_000_000_000;
+  const fresh = { ts: new Date(now - 2_000_000).toISOString() } as any;  // 2000s < 2250s -> not stale
+  const stale = { ts: new Date(now - 2_300_000).toISOString() } as any;  // 2300s > 2250s -> stale
+  expect(freshness(fresh, now).stale).toBe(false);
+  expect(freshness(stale, now).stale).toBe(true);
+});
+
+test("freshness: no status -> no-data, stale", () => {
+  const f = freshness(null, 1_000_000_000_000);
+  expect(f.ageSec).toBe(null);
+  expect(f.stale).toBe(true);
+  expect(f.label).toBe("no data · is the bot running?");
+});
+
+test("freshness: minute and hour formatting", () => {
+  const now = 1_000_000_000_000;
+  expect(freshness({ ts: new Date(now - 240_000).toISOString() } as any, now).label).toBe("updated 4m ago");
+  expect(freshness({ ts: new Date(now - 7_200_000).toISOString() } as any, now).label).toBe("updated 2h ago");
+});
+
+test("brainHealth: latest reason is llm-fallback -> degraded with trailing count", () => {
+  const decisions = [
+    { reason: "rsi ok" }, { reason: "llm-fallback: x" }, { reason: "llm-fallback: y" },
+  ] as any;
+  expect(brainHealth(decisions)).toEqual({ state: "degraded", count: 2 });
+});
+
+test("brainHealth: latest reason healthy -> ok", () => {
+  expect(brainHealth([{ reason: "llm-fallback: x" }, { reason: "buy signal" }] as any))
+    .toEqual({ state: "ok", count: 0 });
+});
+
+test("brainHealth: no decisions -> unknown", () => {
+  expect(brainHealth([])).toEqual({ state: "unknown", count: 0 });
 });
