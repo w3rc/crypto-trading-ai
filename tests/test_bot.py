@@ -472,3 +472,43 @@ def test_live_halt_midcycle_stops_further_orders(tmp_path, monkeypatch):
     assert len(mk.orders) == 1                                      # only the first symbol traded; HALT stopped the rest
     status = _json.loads((tmp_path / "status.json").read_text())
     assert status["halted"] is True
+
+
+def test_status_carries_armed_true(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path)                                  # paper mode
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
+    data = _json.loads((tmp_path / "status.json").read_text())
+    assert data["armed"] is True
+
+def test_status_carries_armed_false(tmp_path, monkeypatch):
+    monkeypatch.delenv("LIVE_TRADING_ARMED", raising=False)
+    cfg = _cfg(tmp_path)
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
+    data = _json.loads((tmp_path / "status.json").read_text())
+    assert data["armed"] is False
+
+
+def test_live_via_control_json_unarmed_routes_to_shadow(tmp_path, monkeypatch):
+    """Spec (sidebar-mode-toggle-design): control.json mode=live + env not armed → shadow, no create_order."""
+    monkeypatch.delenv("LIVE_TRADING_ARMED", raising=False)
+    # Write control.json override; the YAML itself says mode=paper so cfg.mode=="live" is
+    # entirely the result of the control.json override, not a direct assignment.
+    (tmp_path / "control.json").write_text('{"mode": "live"}')
+    (tmp_path / "c.yaml").write_text(
+        "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
+        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\n"
+        f"data_dir: {tmp_path}\nmode: paper\n"
+        "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
+        "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
+        "sentiment:\n  enabled: false\n"
+    )
+    from engine.config import load_config as _load_config
+    cfg = _load_config(str(tmp_path / "c.yaml"))
+    assert cfg.mode == "live"   # verified: control.json won over YAML's paper
+    mk = _LiveMarket()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    # Meaningful assertion: if LIVE_TRADING_ARMED were set, _run_live would call create_order
+    # and mk.orders would be non-empty. Because the env is absent, the bot routes to
+    # _run_shadow, which never calls create_order. Removing the monkeypatch.delenv makes this fail.
+    assert mk.orders == []

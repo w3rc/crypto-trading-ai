@@ -13,7 +13,7 @@ export type RiskStatus = { allow_short: boolean; leverage: number; maintenance_m
                            funding_rate: number; funding_interval_hours: number;
                            max_position_pct: number; stop_loss_pct: number };
 export type FundingStatus = { accrued: number; last_funding_ts: string | null };
-export type Status = { ts: string; strategy: string; exchange: string; mode?: string; halted?: boolean;
+export type Status = { ts: string; strategy: string; exchange: string; mode?: string; halted?: boolean; armed?: boolean;
                        risk: RiskStatus; funding: FundingStatus };
 export type BacktestPoint = { ts: string; equity: number; buyHold: number };
 export type Snapshot = { state: State | null; trades: Trade[]; decisions: Decision[];

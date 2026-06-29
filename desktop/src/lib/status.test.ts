@@ -1,5 +1,5 @@
 import { test, expect } from "vitest";
-import { leverageMode, shortingLabel, fundingSummary, accruedLabel } from "./status";
+import { leverageMode, shortingLabel, fundingSummary, accruedLabel, modeBadge } from "./status";
 import type { Status } from "./parse";
 
 const mk = (over: Partial<Status["risk"]>): Status => ({
@@ -30,4 +30,19 @@ test("accruedLabel", () => {
   expect(accruedLabel(0)).toBe("$0.00");
   expect(accruedLabel(0.8)).toBe("+$0.80 received");
   expect(accruedLabel(-1.234)).toBe("−$1.23 paid");
+});
+
+test("modeBadge maps mode+armed to tone+label", () => {
+  expect(modeBadge("paper", false, false)).toEqual({ label: "PAPER", tone: "paper" });
+  expect(modeBadge("shadow", false, false)).toEqual({ label: "SHADOW", tone: "shadow" });
+  expect(modeBadge("live", false, true)).toEqual({ label: "LIVE", tone: "live" });
+  expect(modeBadge("live", false, false)).toEqual({ label: "LIVE · UNARMED", tone: "live-unarmed" });
+  expect(modeBadge(undefined, false, false)).toEqual({ label: "PAPER", tone: "paper" });
+});
+
+test("modeBadge: halted overrides every mode", () => {
+  expect(modeBadge("live", true, true)).toEqual({ label: "HALTED", tone: "halted" });
+  expect(modeBadge("paper", true, false)).toEqual({ label: "HALTED", tone: "halted" });
+  expect(modeBadge("shadow", true, false)).toEqual({ label: "HALTED", tone: "halted" });
+  expect(modeBadge(undefined, true, false)).toEqual({ label: "HALTED", tone: "halted" });
 });
