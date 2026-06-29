@@ -66,7 +66,7 @@ function Overview({ snap }: { snap: Snapshot }): React.JSX.Element {
           <div className="kpi"><div className="label">Cash</div><div className="value">${cash.toFixed(2)}</div></div>
           <div className="kpi"><div className="label">P&amp;L</div>
             <div className="value" style={{ color: pnl >= 0 ? "var(--up)" : "var(--down)" }}>
-              {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+              {pnl >= 0 ? "+$" : "−$"}{Math.abs(pnl).toFixed(2)}
             </div>
           </div>
         </div>

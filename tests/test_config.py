@@ -259,3 +259,10 @@ def test_control_json_corrupt_ignored(tmp_path):
     (tmp_path / "control.json").write_text("{not json")
     p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "paper"))
     assert load_config(str(p)).mode == "paper"         # corrupt -> config mode
+
+
+def test_control_json_non_dict_ignored(tmp_path):
+    # json.load returns a non-dict (int) -> .get("mode") raises AttributeError -> config mode
+    (tmp_path / "control.json").write_text("123")
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "shadow"))
+    assert load_config(str(p)).mode == "shadow"        # non-dict -> AttributeError branch -> config mode

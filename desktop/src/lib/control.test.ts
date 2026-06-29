@@ -10,6 +10,12 @@ test("writeControl writes {mode} for valid modes", async () => {
   expect(JSON.parse(readFileSync(join(d, "control.json"), "utf8"))).toEqual({ mode: "shadow" });
 });
 
+test("writeControl writes {mode: 'live'} for the live mode", async () => {
+  const d = mkdtempSync(join(tmpdir(), "ctrl-"));
+  await writeControl(d, "live");
+  expect(JSON.parse(readFileSync(join(d, "control.json"), "utf8"))).toEqual({ mode: "live" });
+});
+
 test("writeControl rejects an invalid mode and writes nothing", async () => {
   const d = mkdtempSync(join(tmpdir(), "ctrl-"));
   await expect(writeControl(d, "bogus")).rejects.toThrow();

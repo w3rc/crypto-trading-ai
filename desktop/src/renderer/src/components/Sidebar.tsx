@@ -43,7 +43,7 @@ export default function Sidebar({ status, state, view, onNavigate }: {
   const choose = (m: string): void => {
     if (m === activeMode) return;
     if (m === "live" &&
-        !window.confirm("Switch bot to LIVE mode? Real orders place only if LIVE_TRADING_ARMED=yes is set in the bot's env.")) {
+        !window.confirm("Switch bot to LIVE mode? Real orders are placed only if LIVE_TRADING_ARMED=yes is set in the bot's env.")) {
       return;
     }
     setPending(m);
@@ -62,7 +62,7 @@ export default function Sidebar({ status, state, view, onNavigate }: {
       <div className="rail-acct">
         <div className="rail-eq">${equity.toFixed(2)}</div>
         <div className="rail-pnl" style={{ color: pnl >= 0 ? "var(--up)" : "var(--down)" }}>
-          {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+          {pnl >= 0 ? "+$" : "−$"}{Math.abs(pnl).toFixed(2)}
         </div>
       </div>
 
@@ -70,7 +70,8 @@ export default function Sidebar({ status, state, view, onNavigate }: {
         {NAV.map((n) => (
           <button
             key={n.id}
-            className={`rail-link ${view === n.id ? "active" : ""}`}
+            className={view === n.id ? "rail-link active" : "rail-link"}
+            aria-current={view === n.id ? "page" : undefined}
             onClick={() => onNavigate(n.id)}
           >
             {n.label}
