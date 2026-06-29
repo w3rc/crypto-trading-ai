@@ -88,6 +88,31 @@ def write_status(snapshot: dict, data_dir: str) -> None:
     os.replace(tmp, path)                   # atomic on POSIX
 
 
+def _live_meta_path(data_dir: str) -> str:
+    return os.path.join(data_dir, "live_meta.json")
+
+
+def load_live_meta(data_dir: str) -> dict:
+    """Sidecar {symbol: {avg_price, stop_price}} for live mode; missing/corrupt -> {}."""
+    path = _live_meta_path(data_dir)
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError):     # corrupt sidecar -> rebuild from fills next entry
+        return {}
+
+
+def save_live_meta(meta: dict, data_dir: str) -> None:
+    os.makedirs(data_dir, exist_ok=True)
+    path = _live_meta_path(data_dir)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(meta, f, indent=2)
+    os.replace(tmp, path)                       # atomic on POSIX
+
+
 def append_trade(fill: Fill, data_dir: str) -> None:
     os.makedirs(data_dir, exist_ok=True)
     path = os.path.join(data_dir, "trades.csv")

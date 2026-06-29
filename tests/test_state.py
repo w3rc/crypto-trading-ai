@@ -136,3 +136,18 @@ def test_write_status_atomic_json(tmp_path):
     loaded = json.loads(path.read_text())
     assert loaded["strategy"] == "hybrid" and loaded["risk"]["allow_short"] is True
     assert not (tmp_path / "status.json.tmp").exists()   # temp cleaned (atomic replace)
+
+def test_live_meta_round_trips(tmp_path):
+    from engine import state as state_mod
+    meta = {"BTC/USDT": {"avg_price": 64000.0, "stop_price": 60800.0}}
+    state_mod.save_live_meta(meta, str(tmp_path))
+    assert state_mod.load_live_meta(str(tmp_path)) == meta
+
+def test_live_meta_missing_file_is_empty(tmp_path):
+    from engine import state as state_mod
+    assert state_mod.load_live_meta(str(tmp_path)) == {}
+
+def test_live_meta_corrupt_file_is_empty(tmp_path):
+    from engine import state as state_mod
+    (tmp_path / "live_meta.json").write_text("{not json")
+    assert state_mod.load_live_meta(str(tmp_path)) == {}
