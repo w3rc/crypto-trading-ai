@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { Status, Decision } from "../../../lib/parse";
 import { modeBadge, freshness, brainHealth } from "../../../lib/status";
 
-export type View = "overview" | "positions" | "activity" | "sentiment" | "backtest";
+export type View = "overview" | "positions" | "activity" | "sentiment" | "backtest" | "settings";
 
 const NAV: { id: View; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -10,6 +10,7 @@ const NAV: { id: View; label: string }[] = [
   { id: "activity", label: "Activity" },
   { id: "sentiment", label: "Sentiment" },
   { id: "backtest", label: "Backtest" },
+  { id: "settings", label: "Settings" },
 ];
 
 const MODES: { id: string; label: string }[] = [

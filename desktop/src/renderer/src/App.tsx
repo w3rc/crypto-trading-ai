@@ -8,6 +8,7 @@ import TradesTable from "./components/TradesTable";
 import SentimentPanel from "./components/SentimentPanel";
 import BacktestChart from "./components/BacktestChart";
 import BacktestForm from "./components/BacktestForm";
+import Settings from "./components/Settings";
 import Sidebar, { type View } from "./components/Sidebar";
 
 const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [] };
@@ -46,6 +47,9 @@ export default function App(): React.JSX.Element {
         )}
         {view === "backtest" && (
           <section className="card"><h2>Backtest</h2><BacktestForm /><BacktestChart points={snap.backtest} /></section>
+        )}
+        {view === "settings" && (
+          <section className="card"><h2>Settings</h2><Settings /></section>
         )}
       </main>
     </div>

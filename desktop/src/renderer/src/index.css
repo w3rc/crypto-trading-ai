@@ -111,3 +111,9 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .bt-result { width: 100%; font-size: 13px; color: var(--muted); margin-top: 4px; }
 .bt-error { color: var(--down); }
 .bt-result pre { white-space: pre-wrap; font-size: 12px; margin: 6px 0 0; color: var(--muted); }
+.settings-form { display: flex; flex-direction: column; gap: 14px; max-width: 480px; }
+.settings-row { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); }
+.settings-row input[type="number"] { width: 120px; background: var(--glass); border: 1px solid var(--glass-border);
+  border-radius: 8px; color: var(--text); font: inherit; padding: 7px 10px; }
+.settings-actions { display: flex; gap: 10px; }
+.settings-summary { font-size: 13px; color: var(--muted); }
