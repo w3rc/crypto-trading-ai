@@ -6,7 +6,9 @@ export type Schedule = { enabled: boolean; intervalSeconds: number };
 export const DEFAULT_SCHEDULE: Schedule = { enabled: false, intervalSeconds: 900 };
 
 export function clampInterval(n: number): number {
-  return Math.max(60, (isFinite(n) && Math.round(n)) || 900);   // floor 60s; 0/NaN/Infinity -> 900
+  // floor 60s; cap 1 day; 0/NaN/Infinity -> 900. The cap keeps intervalSeconds*1000 under Node's
+  // TIMEOUT_MAX (~24.8 days) so a huge value can't overflow setInterval into a 1ms tick.
+  return Math.min(86400, Math.max(60, (isFinite(n) && Math.round(n)) || 900));
 }
 
 export function parseSchedule(raw: unknown): Schedule {

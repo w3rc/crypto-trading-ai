@@ -1,10 +1,11 @@
 import { test, expect } from "vitest";
 import { clampInterval, parseSchedule } from "./scheduler";
 
-test("clampInterval floors at 60 and rounds", () => {
+test("clampInterval floors at 60, caps at 86400, and rounds", () => {
   expect(clampInterval(900)).toBe(900);
-  expect(clampInterval(30)).toBe(60);      // floor
-  expect(clampInterval(120.6)).toBe(121);  // rounds
+  expect(clampInterval(30)).toBe(60);        // floor
+  expect(clampInterval(120.6)).toBe(121);    // rounds
+  expect(clampInterval(1e12)).toBe(86400);   // cap — else intervalSeconds*1000 overflows setInterval into a 1ms tick
 });
 
 test("clampInterval falls back to 900 for 0 / NaN / Infinity", () => {

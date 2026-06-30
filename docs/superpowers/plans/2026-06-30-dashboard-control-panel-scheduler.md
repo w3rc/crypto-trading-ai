@@ -91,7 +91,7 @@ git commit -m "refactor(dashboard): extract spawnEngine; add runBot (engine.bot)
 - Produces:
   - `type Schedule = { enabled: boolean; intervalSeconds: number }`
   - `DEFAULT_SCHEDULE: Schedule` (`{ enabled: false, intervalSeconds: 900 }`)
-  - `clampInterval(n: number): number` (floor 60; `Math.round`; 0/NaN → 900)
+  - `clampInterval(n: number): number` (floor 60; cap 86400; `Math.round`; 0/NaN/Infinity → 900)
   - `parseSchedule(raw: unknown): Schedule` (coerce/validate, defaults for missing/garbage)
   - `readSchedule(dir: string): Promise<Schedule>` (missing/corrupt → `DEFAULT_SCHEDULE`)
   - `writeSchedule(dir: string, s: Schedule): Promise<Schedule>` (clamps, writes `scheduler.json`, returns clamped)
@@ -145,7 +145,8 @@ export type Schedule = { enabled: boolean; intervalSeconds: number };
 export const DEFAULT_SCHEDULE: Schedule = { enabled: false, intervalSeconds: 900 };
 
 export function clampInterval(n: number): number {
-  return Math.max(60, Math.round(n) || 900);   // floor 60s; 0/NaN -> 900
+  // floor 60s; cap 1 day; 0/NaN/Infinity -> 900 (cap keeps intervalSeconds*1000 under setInterval's TIMEOUT_MAX)
+  return Math.min(86400, Math.max(60, (isFinite(n) && Math.round(n)) || 900));
 }
 
 export function parseSchedule(raw: unknown): Schedule {

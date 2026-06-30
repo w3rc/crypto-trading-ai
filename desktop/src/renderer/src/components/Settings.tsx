@@ -17,14 +17,19 @@ export default function Settings(): React.JSX.Element {
   const [saved, setSaved] = useState<Schedule | null>(null);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<Result>(null);
+  const [saveMsg, setSaveMsg] = useState("");
 
   useEffect(() => {
     api.getSchedule().then((s) => { setEnabled(s.enabled); setIntervalSeconds(s.intervalSeconds); setSaved(s); });
   }, []);
 
   const save = async (): Promise<void> => {
-    const s = await api.setSchedule({ enabled, intervalSeconds });
-    setEnabled(s.enabled); setIntervalSeconds(s.intervalSeconds); setSaved(s);
+    try {
+      const s = await api.setSchedule({ enabled, intervalSeconds });
+      setEnabled(s.enabled); setIntervalSeconds(s.intervalSeconds); setSaved(s); setSaveMsg("");
+    } catch (err) {
+      setSaveMsg(`Could not save schedule: ${String(err)}`);   // never fail silently — parity with Run now
+    }
   };
 
   const runNow = async (): Promise<void> => {
@@ -49,7 +54,7 @@ export default function Settings(): React.JSX.Element {
       </label>
       <label className="settings-row">
         Interval (seconds)
-        <input type="number" min={60} value={intervalSeconds}
+        <input type="number" min={60} max={86400} value={intervalSeconds}
                onChange={(e) => setIntervalSeconds(Number(e.target.value))} />
       </label>
       <div className="settings-actions">
@@ -62,6 +67,7 @@ export default function Settings(): React.JSX.Element {
           {" "}config.interval_seconds for accurate freshness.
         </div>
       )}
+      {saveMsg && <div className="bt-result bt-error">{saveMsg}</div>}
       {result && result.ok && <div className="bt-result">Bot cycle complete — dashboard updating…</div>}
       {result && !result.ok && (
         <div className="bt-result bt-error">Bot run failed<pre>{result.stderrTail || "(no output)"}</pre></div>

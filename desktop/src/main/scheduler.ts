@@ -10,6 +10,6 @@ export function applySchedule(s: Schedule): void {
   handle = setInterval(() => {
     if (inFlight) return;                          // skip pile-up; bot.lock is the real guard
     inFlight = true;
-    runBot().finally(() => { inFlight = false; });
+    runBot().catch(() => {}).finally(() => { inFlight = false; });   // forever-repeating tick: never let it emit an unhandledRejection
   }, s.intervalSeconds * 1000);
 }

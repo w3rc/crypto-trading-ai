@@ -29,7 +29,7 @@ In-app model (user-chosen): the timer runs only while the dashboard is open — 
 
 ### Scheduler config (src/lib/scheduler.ts — pure + fs, mirrors control.ts)
 - `type Schedule = { enabled: boolean; intervalSeconds: number }`. `DEFAULT_SCHEDULE = { enabled: false, intervalSeconds: 900 }` (default **off** — opt-in).
-- `clampInterval(n): number` = `Math.max(60, Math.round(n) || 900)` — floor 60 s so you can't hammer the LLM/credits; non-finite/0 → 900. (pure, unit-tested)
+- `clampInterval(n): number` = `Math.min(86400, Math.max(60, (isFinite(n) && Math.round(n)) || 900))` — floor 60 s / cap 1 day so you can't hammer the LLM/credits, and a huge value can't overflow `setInterval`'s `TIMEOUT_MAX` (~24.8 days) into a 1 ms tick; non-finite/0/Infinity → 900. (pure, unit-tested)
 - `parseSchedule(raw: unknown): Schedule` — coerce a parsed-JSON value to a valid `Schedule` (boolean `enabled`, clamped `intervalSeconds`), falling back to defaults for missing/garbage fields. (pure, unit-tested)
 - `readSchedule(dir): Promise<Schedule>` — read `scheduler.json` → `parseSchedule`; missing/corrupt → `DEFAULT_SCHEDULE`. `writeSchedule(dir, s): Promise<Schedule>` — clamp + write `scheduler.json`, returns the clamped value. (fs, mirrors control.ts; build-verified)
 
