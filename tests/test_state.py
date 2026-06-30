@@ -1,6 +1,6 @@
 import json as _json
 import pytest
-from engine.state import load_state, save_state_atomic, append_trade, append_decision, equity
+from engine.state import load_state, save_state_atomic, append_trade, append_decision, equity, load_pending, save_pending
 from engine.models import Position, Fill
 
 def test_append_decision_writes_jsonl(tmp_path):
@@ -184,3 +184,23 @@ def test_load_state_unresolved_corrupt_blocks_fresh_start(tmp_path):
     (tmp_path / "state.json.corrupt").write_text("{not valid json")
     with pytest.raises(RuntimeError, match="unresolved"):
         load_state(str(tmp_path), 1000.0, ["BTC/USDT"])
+
+
+def test_pending_round_trip(tmp_path):
+    p = {"ETH/USDT": {"ts": "t", "action": "sell", "size": 1.0, "reason": "r", "price": 1583.35}}
+    save_pending(p, str(tmp_path))
+    assert load_pending(str(tmp_path)) == p
+
+
+def test_load_pending_missing_is_empty(tmp_path):
+    assert load_pending(str(tmp_path)) == {}
+
+
+def test_load_pending_corrupt_is_empty(tmp_path):
+    (tmp_path / "pending.json").write_text("{not json")
+    assert load_pending(str(tmp_path)) == {}
+
+
+def test_load_pending_non_dict_is_empty(tmp_path):
+    (tmp_path / "pending.json").write_text("[1, 2, 3]")
+    assert load_pending(str(tmp_path)) == {}
