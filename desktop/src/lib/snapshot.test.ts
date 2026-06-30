@@ -67,3 +67,18 @@ test("readSnapshot reads status.json + backtest_equity.csv, defaults when absent
   expect(s.backtest).toEqual([]);   // missing -> []
   rmSync(empty, { recursive: true, force: true });
 });
+
+test("readSnapshot parses pending.json into snap.pending", async () => {
+  const d = mkdtempSync(join(tmpdir(), "snap-"));
+  writeFileSync(join(d, "pending.json"), JSON.stringify({
+    "ETH/USDT": { ts: "t", action: "sell", size: 1, reason: "r", price: 1583.35 },
+  }));
+  const snap = await readSnapshot(d);
+  expect(snap.pending["ETH/USDT"].action).toBe("sell");
+});
+
+test("readSnapshot pending defaults to {} when absent", async () => {
+  const d = mkdtempSync(join(tmpdir(), "snap-"));
+  const snap = await readSnapshot(d);
+  expect(snap.pending).toEqual({});
+});

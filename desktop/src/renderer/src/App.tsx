@@ -11,8 +11,9 @@ import BacktestForm from "./components/BacktestForm";
 import Settings from "./components/Settings";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar, { type View } from "./components/Sidebar";
+import PendingPanel from "./components/PendingPanel";
 
-const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [] };
+const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [], pending: {} };
 const api = (window as unknown as { api: { getSnapshot: () => Promise<Snapshot> } }).api;
 
 export default function App(): React.JSX.Element {
@@ -67,6 +68,7 @@ function Overview({ snap }: { snap: Snapshot }): React.JSX.Element {
   const pnl = equity - start;
   return (
     <>
+      <PendingPanel pending={snap.pending} status={snap.status} />
       <div className="kpi-row">
         <section className="card kpi">
           <div className="label">Equity</div>

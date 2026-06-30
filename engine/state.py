@@ -130,6 +130,32 @@ def save_live_meta(meta: dict, data_dir: str) -> None:
     os.replace(tmp, path)                       # atomic on POSIX
 
 
+def _pending_path(data_dir: str) -> str:
+    return os.path.join(data_dir, "pending.json")
+
+
+def load_pending(data_dir: str) -> dict:
+    """Deferred suggestions {symbol: {...}} for manual mode; missing/corrupt/non-dict -> {}."""
+    path = _pending_path(data_dir)
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path) as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def save_pending(pending: dict, data_dir: str) -> None:
+    os.makedirs(data_dir, exist_ok=True)
+    path = _pending_path(data_dir)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(pending, f, indent=2)
+    os.replace(tmp, path)                       # atomic on POSIX
+
+
 def append_trade(fill: Fill, data_dir: str) -> None:
     os.makedirs(data_dir, exist_ok=True)
     path = os.path.join(data_dir, "trades.csv")

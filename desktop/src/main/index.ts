@@ -2,8 +2,9 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import { join } from "path";
 import { is } from "@electron-toolkit/utils";
 import { readSnapshot, dataDir } from "../lib/snapshot";
-import { writeControl } from "../lib/control";
-import { runBacktest, runBot } from "./engine";
+import { writeControl, writeAutoExecute } from "../lib/control";
+import { runBacktest, runBot, executeSuggestion } from "./engine";
+import { removePending } from "../lib/pending";
 import { applySchedule } from "./scheduler";
 import { readSchedule, writeSchedule } from "../lib/scheduler";
 import { writeSymbols } from "../lib/symbols";
@@ -54,6 +55,9 @@ if (!app.requestSingleInstanceLock()) {
       return saved;
     });
     ipcMain.handle("set-symbols", (_e, list) => writeSymbols(dataDir(), list));
+    ipcMain.handle("execute-suggestion", (_e, sym: string) => executeSuggestion(sym));
+    ipcMain.handle("dismiss-suggestion", (_e, sym: string) => removePending(dataDir(), sym));
+    ipcMain.handle("set-auto-execute", (_e, on: boolean) => writeAutoExecute(dataDir(), on));
     readSchedule(dataDir()).then(applySchedule);   // arm the schedule on startup
     createWindow();
     app.on("activate", () => {
