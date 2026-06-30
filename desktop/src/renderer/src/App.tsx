@@ -76,7 +76,7 @@ function Overview({ snap }: { snap: Snapshot }): React.JSX.Element {
         </section>
       </div>
       <div className="grid">
-        <section className="card"><h2>Equity curve</h2><EquityChart history={eq ?? []} /></section>
+        <section className="card span-full"><h2>Equity curve</h2><EquityChart history={eq ?? []} /></section>
         <section className="card"><h2>Open positions</h2><PositionsTable state={snap.state} /></section>
         <section className="card"><h2>Risk</h2><RiskCard status={snap.status} /></section>
       </div>

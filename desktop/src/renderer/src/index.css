@@ -15,13 +15,15 @@ body {
 .main > .grid { margin: 0; }
 .grid { display: grid; gap: 18px; margin-top: 20px; }
 @media (min-width: 820px) { .grid { grid-template-columns: 1fr 1fr; } }
+.grid .span-full { grid-column: 1 / -1; }
 .card {
   background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px;
   padding: 18px 20px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   box-shadow: 0 8px 30px rgba(0,0,0,0.25);
 }
 .card h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
-.kpi-row { display: grid; gap: 18px; margin-top: 20px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.kpi-row { display: grid; gap: 18px; margin: 20px 0 18px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.kpi-row .card.kpi { padding: 14px 20px; }
 .kpi .label { color: var(--muted); font-size: 12px; }
 .kpi .value { font-size: 26px; font-weight: 700; margin-top: 2px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
