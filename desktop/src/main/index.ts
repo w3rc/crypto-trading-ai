@@ -3,6 +3,7 @@ import { join } from "path";
 import { is } from "@electron-toolkit/utils";
 import { readSnapshot, dataDir } from "../lib/snapshot";
 import { writeControl } from "../lib/control";
+import { runBacktest } from "./engine";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -41,6 +42,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     ipcMain.handle("snapshot", () => readSnapshot(dataDir()));
     ipcMain.handle("set-mode", (_e, mode: string) => writeControl(dataDir(), mode));
+    ipcMain.handle("run-backtest", (_e, opts) => runBacktest(opts));
     createWindow();
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
