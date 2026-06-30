@@ -6,6 +6,7 @@ import { writeControl } from "../lib/control";
 import { runBacktest, runBot } from "./engine";
 import { applySchedule } from "./scheduler";
 import { readSchedule, writeSchedule } from "../lib/scheduler";
+import { writeSymbols } from "../lib/symbols";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -52,6 +53,7 @@ if (!app.requestSingleInstanceLock()) {
       applySchedule(saved);
       return saved;
     });
+    ipcMain.handle("set-symbols", (_e, list) => writeSymbols(dataDir(), list));
     readSchedule(dataDir()).then(applySchedule);   // arm the schedule on startup
     createWindow();
     app.on("activate", () => {
