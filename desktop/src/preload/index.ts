@@ -7,6 +7,7 @@ const api = {
   runBot: () => ipcRenderer.invoke("run-bot"),
   getSchedule: () => ipcRenderer.invoke("get-schedule"),
   setSchedule: (s: { enabled: boolean; intervalSeconds: number }) => ipcRenderer.invoke("set-schedule", s),
+  setSymbols: (list: string[]) => ipcRenderer.invoke("set-symbols", list),
 };
 
 if (process.contextIsolated) {

@@ -117,3 +117,12 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
   border-radius: 8px; color: var(--text); font: inherit; padding: 7px 10px; }
 .settings-actions { display: flex; gap: 10px; }
 .settings-summary { font-size: 13px; color: var(--muted); }
+.settings-section-label { font-size: 14px; color: var(--text); }
+.symbol-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.symbol-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--glass);
+  border: 1px solid var(--glass-border); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 13px; }
+.symbol-x { background: none; border: none; color: var(--muted); font: inherit; font-size: 15px;
+  line-height: 1; cursor: pointer; padding: 0 4px; }
+.symbol-x:disabled { opacity: 0.35; cursor: not-allowed; }
+.symbol-input { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 8px;
+  color: var(--text); font: inherit; padding: 7px 10px; width: 150px; }

@@ -277,3 +277,39 @@ def test_interval_seconds_defaults_to_900(tmp_path):
 def test_interval_seconds_from_yaml(tmp_path):
     p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "paper") + "interval_seconds: 300\n")
     assert load_config(str(p)).interval_seconds == 300     # yaml value wins
+
+
+def test_symbols_override_uses_valid_list(tmp_path):
+    import json as _j
+    from engine.config import _symbols_override
+    (tmp_path / "symbols.json").write_text(_j.dumps(["SOL/USDT", "XRP/USDT"]))
+    assert _symbols_override(str(tmp_path), ["BTC/USDT"]) == ["SOL/USDT", "XRP/USDT"]
+
+
+def test_symbols_override_falls_back_to_default(tmp_path):
+    from engine.config import _symbols_override
+    d = ["BTC/USDT"]
+    assert _symbols_override(str(tmp_path), d) == d                       # missing file
+    (tmp_path / "symbols.json").write_text("{not json")
+    assert _symbols_override(str(tmp_path), d) == d                       # corrupt
+    (tmp_path / "symbols.json").write_text('{"a": 1}')
+    assert _symbols_override(str(tmp_path), d) == d                       # not a list
+    (tmp_path / "symbols.json").write_text('["btcusdt", "BTC-USDT", 5]')
+    assert _symbols_override(str(tmp_path), d) == d                       # all invalid
+    (tmp_path / "symbols.json").write_text("[]")
+    assert _symbols_override(str(tmp_path), d) == d                       # empty
+
+
+def test_status_payload_includes_symbols(tmp_path, monkeypatch):
+    from engine.config import load_config
+    from engine.bot import _status_payload
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    p = tmp_path / "c.yaml"
+    p.write_text(
+        "exchange: binance\nsymbols: [BTC/USDT, ETH/USDT]\ntimeframe: 15m\n"
+        f"paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: {tmp_path}\n"
+        "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
+        "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
+    )
+    cfg = load_config(str(p))
+    assert _status_payload(cfg, "t1", 0.0, None)["symbols"] == ["BTC/USDT", "ETH/USDT"]
