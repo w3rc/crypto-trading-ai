@@ -42,10 +42,12 @@ export default function App(): React.JSX.Element {
         <ErrorBoundary key={view}>
           {view === "overview" && <Overview snap={snap} />}
           {view === "positions" && (
-            <>
+            <div className="grid">
               <PendingPanel pending={snap.pending} status={snap.status} />
-              <section className="card"><h2>Open positions</h2><PositionsTable state={snap.state} /></section>
-            </>
+              <section className={`card${Object.keys(snap.pending).length ? "" : " span-full"}`}>
+                <h2>Open positions</h2><PositionsTable state={snap.state} />
+              </section>
+            </div>
           )}
           {view === "activity" && <Activity snap={snap} />}
           {view === "sentiment" && (
