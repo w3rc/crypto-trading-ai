@@ -126,3 +126,5 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .symbol-x:disabled { opacity: 0.35; cursor: not-allowed; }
 .symbol-input { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 8px;
   color: var(--text); font: inherit; padding: 7px 10px; width: 150px; }
+.error-fallback .muted { color: var(--muted); margin: 4px 0 0; }
+.error-fallback pre { white-space: pre-wrap; color: var(--down); font-size: 13px; margin: 10px 0; }

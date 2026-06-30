@@ -9,6 +9,7 @@ import SentimentPanel from "./components/SentimentPanel";
 import BacktestChart from "./components/BacktestChart";
 import BacktestForm from "./components/BacktestForm";
 import Settings from "./components/Settings";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar, { type View } from "./components/Sidebar";
 
 const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [] };
@@ -37,20 +38,22 @@ export default function App(): React.JSX.Element {
     <div className="app">
       <Sidebar status={snap.status} view={view} onNavigate={setView} decisions={snap.decisions} />
       <main className="main">
-        {view === "overview" && <Overview snap={snap} />}
-        {view === "positions" && (
-          <section className="card"><h2>Open positions</h2><PositionsTable state={snap.state} /></section>
-        )}
-        {view === "activity" && <Activity snap={snap} />}
-        {view === "sentiment" && (
-          <section className="card"><h2>Sentiment</h2><SentimentPanel sentiment={snap.sentiment} /></section>
-        )}
-        {view === "backtest" && (
-          <section className="card"><h2>Backtest</h2><BacktestForm /><BacktestChart points={snap.backtest} /></section>
-        )}
-        {view === "settings" && (
-          <section className="card"><h2>Settings</h2><Settings status={snap.status} state={snap.state} /></section>
-        )}
+        <ErrorBoundary key={view}>
+          {view === "overview" && <Overview snap={snap} />}
+          {view === "positions" && (
+            <section className="card"><h2>Open positions</h2><PositionsTable state={snap.state} /></section>
+          )}
+          {view === "activity" && <Activity snap={snap} />}
+          {view === "sentiment" && (
+            <section className="card"><h2>Sentiment</h2><SentimentPanel sentiment={snap.sentiment} /></section>
+          )}
+          {view === "backtest" && (
+            <section className="card"><h2>Backtest</h2><BacktestForm /><BacktestChart points={snap.backtest} /></section>
+          )}
+          {view === "settings" && (
+            <section className="card"><h2>Settings</h2><Settings status={snap.status} state={snap.state} /></section>
+          )}
+        </ErrorBoundary>
       </main>
     </div>
   );

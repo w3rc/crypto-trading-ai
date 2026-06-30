@@ -1,4 +1,5 @@
 import type { Decision } from "../../../lib/parse";
+import { formatDecisionTime } from "../../../lib/format";
 
 type Row = Decision & { count: number };
 
@@ -33,7 +34,7 @@ export default function DecisionLog({ decisions }: { decisions: Decision[] }) {
       <tbody>
         {rows.map((d, i) => (
           <tr key={`${d.ts}-${d.symbol}-${i}`}>
-            <td className="muted">{new Date(d.ts).toLocaleTimeString()}</td>
+            <td className="muted">{formatDecisionTime(d.ts, Date.now())}</td>
             <td>{d.symbol}</td>
             <td><span className={`badge ${d.action}`}>{d.action}</span></td>
             <td>${d.price.toFixed(2)}</td>
