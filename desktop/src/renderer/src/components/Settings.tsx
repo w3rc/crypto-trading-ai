@@ -62,7 +62,8 @@ export default function Settings({ status, state }: { status: Status | null; sta
 
   const addSymbol = (): void => {
     const s = symInput.trim().toUpperCase();
-    if (validSymbol(s) && !symbols.includes(s)) { setSymbols([...symbols, s]); setSymInput(""); setSymMsg(""); }
+    setSymMsg("");   // clear any stale message (incl. on a no-op duplicate add)
+    if (validSymbol(s) && !symbols.includes(s)) { setSymbols([...symbols, s]); setSymInput(""); }
     else if (!validSymbol(s)) setSymMsg(`Not a valid pair: "${symInput}" (use BASE/QUOTE, e.g. SOL/USDT)`);
   };
 
