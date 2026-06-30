@@ -176,3 +176,11 @@ def test_load_state_missing_required_key_backs_up_and_raises(tmp_path):
     with pytest.raises(RuntimeError):
         load_state(str(tmp_path), 1000.0, [])
     assert (tmp_path / "state.json.corrupt").exists()
+
+
+def test_load_state_unresolved_corrupt_blocks_fresh_start(tmp_path):
+    # a prior cycle moved a corrupt file aside; state.json is gone but .corrupt remains ->
+    # the bot must stay down (raise), NOT silently start a fresh portfolio
+    (tmp_path / "state.json.corrupt").write_text("{not valid json")
+    with pytest.raises(RuntimeError, match="unresolved"):
+        load_state(str(tmp_path), 1000.0, ["BTC/USDT"])

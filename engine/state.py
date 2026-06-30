@@ -36,6 +36,12 @@ def load_state(data_dir: str, initial_capital: float, symbols: list[str]) -> Sta
     os.makedirs(data_dir, exist_ok=True)
     path = _state_path(data_dir)
     if not os.path.exists(path):
+        corrupt = path + ".corrupt"
+        if os.path.exists(corrupt):     # a prior cycle moved a corrupt state aside; don't silently start fresh
+            raise RuntimeError(
+                f"prior corruption unresolved: {corrupt} exists but {path} is gone. "
+                f"Restore a good state.json or delete {corrupt} to start fresh."
+            )
         return State(cash=initial_capital,
                      positions={s: Position(s) for s in symbols},
                      equity_history=[])
@@ -45,6 +51,8 @@ def load_state(data_dir: str, initial_capital: float, symbols: list[str]) -> Sta
         positions = {s: Position(**{k: v for k, v in p.items() if k in _POS_FIELDS})
                      for s, p in raw["positions"].items()}
         cash = raw["cash"]
+        # ponytail: keep this try body limited to parse/extract — a future edit adding real
+        # logic here could get its own bug relabeled "corrupt" and rename a good state.json.
     except (json.JSONDecodeError, OSError, ValueError, KeyError, TypeError, AttributeError) as e:
         corrupt = path + ".corrupt"
         os.replace(path, corrupt)            # preserve the bad file; never silently reset the portfolio

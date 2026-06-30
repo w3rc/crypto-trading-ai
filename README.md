@@ -67,7 +67,7 @@ between **Overview** (account, equity curve, open positions, risk limits), **Pos
 
 The desktop app is single-instance (a second launch focuses the running window). Runtime files in
 `data/` (`state.json`, `status.json`, `control.json`, `live_meta.json`, `HALT`, …) are gitignored — a
-corrupt `state.json` is backed up to `state.json.corrupt` and the bot stops loudly rather than resetting.
+corrupt `state.json` is backed up to `state.json.corrupt` and the bot stops loudly and stays down until you restore `state.json` or delete `state.json.corrupt` — it never silently resets the portfolio.
 
 The **Sentiment** view renders per symbol: the blended score (Fear/Greed label + gauge), the per-source breakdown (`F&G` / `news` / `reddit` / `X`, with `—` for sources without a key), and the active strategy. It reads `data/sentiment.json`, which the bot writes each cycle.
 
