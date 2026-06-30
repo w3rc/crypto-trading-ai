@@ -1,4 +1,5 @@
 import json as _json
+import pytest
 from engine.state import load_state, save_state_atomic, append_trade, append_decision, equity
 from engine.models import Position, Fill
 
@@ -160,3 +161,18 @@ def test_live_meta_non_utf8_file_is_empty(tmp_path):
     from engine import state as state_mod
     (tmp_path / "live_meta.json").write_bytes(b"\xff\xfe\x00bad")
     assert state_mod.load_live_meta(str(tmp_path)) == {}
+
+
+def test_load_state_corrupt_json_backs_up_and_raises(tmp_path):
+    (tmp_path / "state.json").write_text("{not valid json")
+    with pytest.raises(RuntimeError, match="corrupt"):
+        load_state(str(tmp_path), 1000.0, ["BTC/USDT"])
+    assert (tmp_path / "state.json.corrupt").exists()      # bad file preserved
+    assert not (tmp_path / "state.json").exists()          # moved aside, not silently reset
+
+
+def test_load_state_missing_required_key_backs_up_and_raises(tmp_path):
+    (tmp_path / "state.json").write_text('{"positions": {}}')   # no "cash" key
+    with pytest.raises(RuntimeError):
+        load_state(str(tmp_path), 1000.0, [])
+    assert (tmp_path / "state.json.corrupt").exists()

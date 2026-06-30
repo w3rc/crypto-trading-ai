@@ -39,13 +39,22 @@ def load_state(data_dir: str, initial_capital: float, symbols: list[str]) -> Sta
         return State(cash=initial_capital,
                      positions={s: Position(s) for s in symbols},
                      equity_history=[])
-    with open(path) as f:
-        raw = json.load(f)
-    positions = {s: Position(**{k: v for k, v in p.items() if k in _POS_FIELDS})
-                 for s, p in raw["positions"].items()}
+    try:
+        with open(path) as f:
+            raw = json.load(f)
+        positions = {s: Position(**{k: v for k, v in p.items() if k in _POS_FIELDS})
+                     for s, p in raw["positions"].items()}
+        cash = raw["cash"]
+    except (json.JSONDecodeError, OSError, ValueError, KeyError, TypeError, AttributeError) as e:
+        corrupt = path + ".corrupt"
+        os.replace(path, corrupt)            # preserve the bad file; never silently reset the portfolio
+        raise RuntimeError(
+            f"state.json is corrupt ({e}); backed up to {corrupt}. "
+            f"Restore a good copy or delete it to start fresh."
+        ) from e
     for s in symbols:                       # ensure newly-added symbols exist
         positions.setdefault(s, Position(s))
-    return State(cash=raw["cash"], positions=positions,
+    return State(cash=cash, positions=positions,
                  equity_history=raw.get("equity_history", []),
                  last_funding_ts=raw.get("last_funding_ts"),
                  funding_accrued=raw.get("funding_accrued", 0.0))
