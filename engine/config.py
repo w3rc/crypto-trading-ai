@@ -67,6 +67,7 @@ class Config:
     sentiment: SentimentConfig = field(default_factory=SentimentConfig)
     mode: str = "paper"
     interval_seconds: int = 900
+    auto_execute: bool = False
     exchange_api_key: str = field(default="", repr=False)
     exchange_secret: str = field(default="", repr=False)
 
@@ -83,6 +84,17 @@ def _mode_override(data_dir: str, default: str) -> str:
     except (OSError, json.JSONDecodeError, ValueError, AttributeError):
         return default                      # missing / unreadable / bad JSON / non-dict -> config mode
     return m if m in _VALID_MODES else default
+
+
+def _auto_execute_override(data_dir: str, default: bool) -> bool:
+    """A bool `auto_execute` in <data_dir>/control.json overrides config; fail-safe to default."""
+    path = os.path.join(data_dir, "control.json")
+    try:
+        with open(path) as f:
+            v = json.load(f).get("auto_execute")
+    except (OSError, json.JSONDecodeError, ValueError, AttributeError):
+        return default                      # missing / unreadable / bad JSON / non-dict
+    return v if isinstance(v, bool) else default
 
 
 _SYMBOL_RE = re.compile(r"^[A-Z0-9]+/[A-Z0-9]+$")
@@ -158,6 +170,7 @@ def load_config(path: str = "engine/config.yaml") -> Config:
             http_timeout=float(sent_raw.get("http_timeout", 6.0)),
         ),
         mode=_mode_override(raw["data_dir"], raw.get("mode", "paper")),
+        auto_execute=_auto_execute_override(raw["data_dir"], bool(raw.get("auto_execute", False))),
         interval_seconds=int(raw.get("interval_seconds", 900)),
         exchange_api_key=os.environ.get(raw.get("exchange_api_key_env", "EXCHANGE_API_KEY"), ""),
         exchange_secret=os.environ.get(raw.get("exchange_secret_env", "EXCHANGE_API_SECRET"), ""),

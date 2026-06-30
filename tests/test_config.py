@@ -1,5 +1,5 @@
 import os
-from engine.config import load_config
+from engine.config import load_config, _auto_execute_override
 
 def test_load_config_defaults(monkeypatch):
     monkeypatch.setenv("MYHERMES_API_KEY", "test-key-123")
@@ -313,3 +313,22 @@ def test_status_payload_includes_symbols(tmp_path, monkeypatch):
     )
     cfg = load_config(str(p))
     assert _status_payload(cfg, "t1", 0.0, None)["symbols"] == ["BTC/USDT", "ETH/USDT"]
+
+
+def test_auto_execute_override_default_when_missing(tmp_path):
+    assert _auto_execute_override(str(tmp_path), False) is False
+    assert _auto_execute_override(str(tmp_path), True) is True
+
+
+def test_auto_execute_override_reads_bool(tmp_path):
+    (tmp_path / "control.json").write_text('{"auto_execute": true}')
+    assert _auto_execute_override(str(tmp_path), False) is True
+    (tmp_path / "control.json").write_text('{"auto_execute": false}')
+    assert _auto_execute_override(str(tmp_path), True) is False
+
+
+def test_auto_execute_override_non_bool_falls_back(tmp_path):
+    (tmp_path / "control.json").write_text('{"auto_execute": "yes"}')   # not a bool
+    assert _auto_execute_override(str(tmp_path), False) is False
+    (tmp_path / "control.json").write_text("not json")
+    assert _auto_execute_override(str(tmp_path), True) is True

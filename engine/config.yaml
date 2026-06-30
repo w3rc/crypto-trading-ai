@@ -6,6 +6,7 @@ fee_pct: 0.001
 slippage_pct: 0.0005
 data_dir: data
 mode: paper                       # paper (simulated) | shadow (real read-only) | live (real orders)
+auto_execute: false   # OFF = bot proposes; you Execute/Dismiss each trade. Dashboard toggles this.
 # Live also requires env LIVE_TRADING_ARMED=yes (second switch); touch data/HALT to stop instantly.
 # exchange_api_key_env: EXCHANGE_API_KEY      # env var holding a READ-ONLY exchange key (shadow)
 # exchange_secret_env: EXCHANGE_API_SECRET
