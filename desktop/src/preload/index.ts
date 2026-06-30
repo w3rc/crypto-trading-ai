@@ -8,6 +8,9 @@ const api = {
   getSchedule: () => ipcRenderer.invoke("get-schedule"),
   setSchedule: (s: { enabled: boolean; intervalSeconds: number }) => ipcRenderer.invoke("set-schedule", s),
   setSymbols: (list: string[]) => ipcRenderer.invoke("set-symbols", list),
+  executeSuggestion: (symbol: string) => ipcRenderer.invoke("execute-suggestion", symbol),
+  dismissSuggestion: (symbol: string) => ipcRenderer.invoke("dismiss-suggestion", symbol),
+  setAutoExecute: (on: boolean) => ipcRenderer.invoke("set-auto-execute", on),
 };
 
 if (process.contextIsolated) {
