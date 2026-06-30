@@ -1,7 +1,7 @@
 {
   "name": "crypto-bot-desktop",
   "version": "1.0.0",
-  "description": "Read-only Electron dashboard for the crypto paper-trading bot",
+  "description": "Read-only Electron dashboard for the crypto trading bot",
   "main": "./out/main/index.js",
   "author": "",
   "scripts": {
