@@ -49,7 +49,7 @@ export default function App(): React.JSX.Element {
           <section className="card"><h2>Backtest</h2><BacktestForm /><BacktestChart points={snap.backtest} /></section>
         )}
         {view === "settings" && (
-          <section className="card"><h2>Settings</h2><Settings /></section>
+          <section className="card"><h2>Settings</h2><Settings status={snap.status} state={snap.state} /></section>
         )}
       </main>
     </div>

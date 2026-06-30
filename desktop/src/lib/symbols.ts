@@ -1,6 +1,3 @@
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-
 const PAIR = /^[A-Z0-9]+\/[A-Z0-9]+$/;
 
 export function validSymbol(s: string): boolean {
@@ -19,6 +16,8 @@ export function parseSymbols(raw: unknown): string[] {
 }
 
 export async function writeSymbols(dir: string, symbols: string[]): Promise<string[]> {
+  const { writeFile, mkdir } = await import("fs/promises");
+  const { join } = await import("path");
   const clean = parseSymbols(symbols);
   if (!clean.length) throw new Error("at least one symbol required");
   await mkdir(dir, { recursive: true });
