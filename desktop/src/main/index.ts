@@ -3,7 +3,9 @@ import { join } from "path";
 import { is } from "@electron-toolkit/utils";
 import { readSnapshot, dataDir } from "../lib/snapshot";
 import { writeControl } from "../lib/control";
-import { runBacktest } from "./engine";
+import { runBacktest, runBot } from "./engine";
+import { applySchedule } from "./scheduler";
+import { readSchedule, writeSchedule } from "../lib/scheduler";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -43,6 +45,14 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle("snapshot", () => readSnapshot(dataDir()));
     ipcMain.handle("set-mode", (_e, mode: string) => writeControl(dataDir(), mode));
     ipcMain.handle("run-backtest", (_e, opts) => runBacktest(opts));
+    ipcMain.handle("run-bot", () => runBot());
+    ipcMain.handle("get-schedule", () => readSchedule(dataDir()));
+    ipcMain.handle("set-schedule", async (_e, s) => {
+      const saved = await writeSchedule(dataDir(), s);
+      applySchedule(saved);
+      return saved;
+    });
+    readSchedule(dataDir()).then(applySchedule);   // arm the schedule on startup
     createWindow();
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
