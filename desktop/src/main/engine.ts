@@ -13,17 +13,26 @@ function pythonPath(repoRoot: string): string {
 }
 
 // ponytail: dev-local repoRoot/venv resolution; packaged-app python bundling (deferred C1) is out of scope.
-export function runBacktest(opts: BacktestOpts): Promise<RunResult> {
-  if (!isIsoDate(opts.since)) {
-    return Promise.resolve({ ok: false, code: null, stderrTail: `invalid since date: ${opts.since} (expected YYYY-MM-DD)` });
-  }
+// Every engine spawn goes through here, so pinnedEnv (LIVE_TRADING_ARMED="no") is applied uniformly.
+function spawnEngine(args: string[]): Promise<RunResult> {
   const repoRoot = resolve(dataDir(), "..");
-  const env = pinnedEnv(process.env);     // LIVE_TRADING_ARMED pinned "no" — can never arm live (survives the engine's .env loader)
+  const env = pinnedEnv(process.env);
   return new Promise((resolveP) => {
-    const child = spawn(pythonPath(repoRoot), buildBacktestArgs(opts), { cwd: repoRoot, env });
+    const child = spawn(pythonPath(repoRoot), args, { cwd: repoRoot, env });
     let stderr = "";
     child.stderr.on("data", (d) => { stderr = (stderr + d.toString()).slice(-2048); });
     child.on("error", (e) => resolveP({ ok: false, code: null, stderrTail: e.message }));
     child.on("close", (code) => resolveP({ ok: code === 0, code, stderrTail: stderr.trim() }));
   });
+}
+
+export function runBacktest(opts: BacktestOpts): Promise<RunResult> {
+  if (!isIsoDate(opts.since)) {
+    return Promise.resolve({ ok: false, code: null, stderrTail: `invalid since date: ${opts.since} (expected YYYY-MM-DD)` });
+  }
+  return spawnEngine(buildBacktestArgs(opts));
+}
+
+export function runBot(): Promise<RunResult> {
+  return spawnEngine(["-m", "engine.bot"]);
 }
