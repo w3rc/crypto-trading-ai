@@ -30,11 +30,17 @@ export function parseTradesCsv(text: string): Trade[] {
 }
 
 export function parseDecisions(text: string): Decision[] {
-  return text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l !== "")
-    .map((l) => JSON.parse(l) as Decision);
+  const out: Decision[] = [];
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (t === "") continue;
+    try {
+      out.push(JSON.parse(t) as Decision);
+    } catch {
+      // skip a torn/partial line (e.g. process killed mid-append) — keep the rest
+    }
+  }
+  return out;
 }
 
 export function parseSentiment(text: string): SentimentSnapshot {
