@@ -191,9 +191,11 @@ def test_funding_explicit(tmp_path, monkeypatch):
     assert cfg.risk.funding_interval_hours == 4.0
 
 
-def test_mode_defaults_paper(monkeypatch):
+def test_mode_defaults_paper(tmp_path, monkeypatch):
     monkeypatch.setenv("MYHERMES_API_KEY", "k")
-    assert load_config("engine/config.yaml").mode == "paper"
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "engine", "config.yaml")
+    monkeypatch.chdir(tmp_path)   # hermetic: config's relative data_dir 'data' -> empty tmp dir, no stray control.json override
+    assert load_config(cfg_path).mode == "paper"
 
 def test_mode_and_credentials_load(tmp_path, monkeypatch):
     monkeypatch.setenv("MYHERMES_API_KEY", "k")
@@ -202,7 +204,8 @@ def test_mode_and_credentials_load(tmp_path, monkeypatch):
     p = tmp_path / "c.yaml"
     p.write_text(
         "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
-        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: data\n"
+        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\n"
+        f"data_dir: {tmp_path}\n"      # hermetic: own tmp dir, not the real data/ (no stray control.json override)
         "mode: shadow\n"
         "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
         "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
