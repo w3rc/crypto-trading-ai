@@ -7,6 +7,7 @@ data/trades.csv
 data/decisions.jsonl
 data/status.json
 data/control.json
+data/scheduler.json
 data/live_meta.json
 data/HALT
 data/bot.lock
