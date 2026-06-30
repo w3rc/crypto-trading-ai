@@ -101,3 +101,13 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .brain-ok { color: var(--muted); }
 .brain-degraded { color: var(--down); background: rgba(239,68,68,0.12); }
 .dup-count { color: var(--accent); font-weight: 600; }
+.bt-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; margin-bottom: 16px; }
+.bt-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.bt-form input { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 8px;
+  color: var(--text); font: inherit; padding: 7px 10px; color-scheme: dark; }
+.bt-run { background: var(--accent); color: #0a0e1a; border: none; border-radius: 8px; font: inherit;
+  font-weight: 600; padding: 8px 16px; cursor: pointer; }
+.bt-run:disabled { opacity: 0.5; cursor: not-allowed; }
+.bt-result { width: 100%; font-size: 13px; color: var(--muted); margin-top: 4px; }
+.bt-error { color: var(--down); }
+.bt-result pre { white-space: pre-wrap; font-size: 12px; margin: 6px 0 0; color: var(--muted); }
