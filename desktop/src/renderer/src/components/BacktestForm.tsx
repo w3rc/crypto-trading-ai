@@ -16,9 +16,14 @@ export default function BacktestForm(): React.JSX.Element {
     if (!since || running) return;
     setRunning(true);
     setResult(null);
-    const r = await api.runBacktest({ since, until: until || undefined });
-    setRunning(false);
-    setResult({ ok: r.ok, stderrTail: r.stderrTail });
+    try {
+      const r = await api.runBacktest({ since, until: until || undefined });
+      setResult({ ok: r.ok, stderrTail: r.stderrTail });
+    } catch (err) {
+      setResult({ ok: false, stderrTail: String(err) });   // IPC rejected — never leave the button stuck on "Running…"
+    } finally {
+      setRunning(false);
+    }
   };
 
   return (
