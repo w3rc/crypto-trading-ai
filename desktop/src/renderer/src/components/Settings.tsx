@@ -11,6 +11,7 @@ const api = (window as unknown as {
     getSchedule: () => Promise<Schedule>;
     setSchedule: (s: Schedule) => Promise<Schedule>;
     setSymbols: (list: string[]) => Promise<string[]>;
+    setAutoExecute: (on: boolean) => Promise<void>;
   };
 }).api;
 
@@ -22,6 +23,9 @@ export default function Settings({ status, state }: { status: Status | null; sta
   const [result, setResult] = useState<Result>(null);
   const [saveMsg, setSaveMsg] = useState("");
 
+  const [autoExec, setAutoExec] = useState(false);
+  const [autoSeeded, setAutoSeeded] = useState(false);
+
   const [symbols, setSymbols] = useState<string[]>([]);
   const [symInput, setSymInput] = useState("");
   const [seeded, setSeeded] = useState(false);
@@ -32,8 +36,19 @@ export default function Settings({ status, state }: { status: Status | null; sta
   }, []);
 
   useEffect(() => {
+    if (!autoSeeded && status && typeof status.auto_execute === "boolean") {
+      setAutoExec(status.auto_execute); setAutoSeeded(true);
+    }
+  }, [status, autoSeeded]);
+
+  useEffect(() => {
     if (!seeded && status?.symbols) { setSymbols(status.symbols); setSeeded(true); }
   }, [status, seeded]);
+
+  const toggleAuto = async (on: boolean): Promise<void> => {
+    setAutoExec(on);
+    try { await api.setAutoExecute(on); } catch { /* status poll reconciles on failure */ }
+  };
 
   const save = async (): Promise<void> => {
     try {
@@ -83,6 +98,10 @@ export default function Settings({ status, state }: { status: Status | null; sta
 
   return (
     <div className="settings-form">
+      <label className="settings-row">
+        <input type="checkbox" checked={autoExec} onChange={(e) => toggleAuto(e.target.checked)} />
+        Auto-execute trades — when off, the bot only proposes; you Execute/Dismiss each suggestion. In live mode an Execute places a real order.
+      </label>
       <div className="settings-section-label">Trading pairs</div>
       <div className="symbol-chips">
         {symbols.map((s) => (
