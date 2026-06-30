@@ -71,7 +71,6 @@ function Overview({ snap }: { snap: Snapshot }): React.JSX.Element {
   const pnl = equity - start;
   return (
     <>
-      <PendingPanel pending={snap.pending} status={snap.status} />
       <div className="kpi-row">
         <section className="card kpi">
           <div className="label">Equity</div>
