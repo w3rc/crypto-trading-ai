@@ -363,4 +363,6 @@ def _safe_write_status(cfg, ts, halted) -> None:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
+    from engine.env import load_dotenv
+    load_dotenv()
     run_once()
