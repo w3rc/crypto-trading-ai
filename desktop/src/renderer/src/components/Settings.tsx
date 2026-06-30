@@ -58,7 +58,8 @@ export default function Settings({ status, state }: { status: Status | null; sta
     }
   };
 
-  const hasPosition = (sym: string): boolean => (state?.positions?.[sym]?.qty ?? 0) !== 0;
+  // unknown state (null) -> treat as "may hold a position" so the orphan guard never fails open
+  const hasPosition = (sym: string): boolean => state == null || (state.positions?.[sym]?.qty ?? 0) !== 0;
 
   const addSymbol = (): void => {
     const s = symInput.trim().toUpperCase();
