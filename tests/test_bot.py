@@ -4,7 +4,7 @@ import pandas as pd
 from engine import bot
 from engine.config import Config, RiskConfig, LLMConfig, SentimentConfig
 from engine.models import Decision, Position
-from engine.state import load_state
+from engine.state import load_state, save_pending
 
 def _cfg(tmp_path, symbols=("BTC/USDT",)):
     return Config(exchange="x", symbols=list(symbols), timeframe="15m",
@@ -12,7 +12,8 @@ def _cfg(tmp_path, symbols=("BTC/USDT",)):
                   data_dir=str(tmp_path),
                   risk=RiskConfig(max_position_pct=0.25, stop_loss_pct=0.05),
                   llm=LLMConfig(base_url="x", api_key="x", model="m", json_mode=True),
-                  sentiment=SentimentConfig(enabled=False))
+                  sentiment=SentimentConfig(enabled=False),
+                  auto_execute=True)  # pre-existing tests rely on execute-by-default behaviour
 
 def _df():
     closes = [100.0 + i for i in range(60)]
@@ -519,3 +520,96 @@ def test_status_carries_interval_seconds(tmp_path):
     bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
     data = _json.loads((tmp_path / "status.json").read_text())
     assert data["interval_seconds"] == 900
+
+
+def test_paper_auto_off_defers_to_pending(tmp_path):
+    cfg = _cfg(tmp_path); cfg.auto_execute = False
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="buy", size=1.0)))
+    # no fill happened
+    assert not (tmp_path / "trades.csv").exists()
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st.positions["BTC/USDT"].qty == 0.0
+    # decision logged as not executed
+    rec = _json.loads((tmp_path / "decisions.jsonl").read_text().strip().splitlines()[-1])
+    assert rec["action"] == "buy" and rec["executed"] is False
+    # suggestion recorded
+    pend = _json.loads((tmp_path / "pending.json").read_text())
+    assert pend["BTC/USDT"]["action"] == "buy" and pend["BTC/USDT"]["size"] == 1.0
+
+
+def test_paper_auto_on_executes(tmp_path):
+    cfg = _cfg(tmp_path); cfg.auto_execute = True
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="buy", size=1.0)))
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st.positions["BTC/USDT"].qty > 0                 # auto-on still trades
+    pend = _json.loads((tmp_path / "pending.json").read_text())
+    assert "BTC/USDT" not in pend                            # nothing pending
+
+
+def test_paper_auto_off_hold_clears_pending(tmp_path):
+    cfg = _cfg(tmp_path); cfg.auto_execute = False
+    save_pending({"BTC/USDT": {"ts": "t", "action": "buy", "size": 1.0, "reason": "r", "price": 1.0}},
+                 str(tmp_path))
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
+    pend = _json.loads((tmp_path / "pending.json").read_text())
+    assert "BTC/USDT" not in pend                            # a HOLD clears a stale suggestion
+
+
+def test_paper_forced_decision_executes_despite_auto_off(tmp_path):
+    cfg = _cfg(tmp_path); cfg.auto_execute = False
+    # strategy says hold; forced says buy -> forced wins AND executes (bypasses deferral)
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")),
+                 only_symbol="BTC/USDT", forced_decision=Decision(action="buy", size=1.0))
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st.positions["BTC/USDT"].qty > 0
+
+
+def test_only_symbol_scopes_the_cycle(tmp_path):
+    cfg = _cfg(tmp_path, symbols=("BTC/USDT", "ETH/USDT")); cfg.auto_execute = True
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="buy", size=1.0)),
+                 only_symbol="ETH/USDT")
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT", "ETH/USDT"])
+    assert st.positions["BTC/USDT"].qty == 0.0              # untouched
+    assert st.positions["ETH/USDT"].qty > 0                 # only ETH processed
+
+
+def test_stop_loss_still_executes_when_auto_off(tmp_path):
+    cfg = _cfg(tmp_path); cfg.auto_execute = False          # auto OFF
+    st = load_state(str(tmp_path), 10000.0, ["BTC/USDT"]); st.cash = 0.0
+    st.positions["BTC/USDT"] = Position("BTC/USDT", qty=1.0, avg_price=210.0, stop_price=200.0)
+    from engine.state import save_state_atomic
+    save_state_atomic(st, str(tmp_path))
+    bot.run_once(cfg, market=FakeMarket(price=159.0), strategy=_strat(Decision(action="hold")))
+    st2 = load_state(str(tmp_path), 10000.0, ["BTC/USDT"])
+    assert st2.positions["BTC/USDT"].qty == 0.0             # stop fired despite auto OFF — never deferred
+    pend = _json.loads((tmp_path / "pending.json").read_text())
+    assert "BTC/USDT" not in pend
+
+
+def test_live_auto_off_defers_no_real_order(tmp_path, monkeypatch):
+    monkeypatch.setenv("LIVE_TRADING_ARMED", "yes")
+    cfg = _cfg(tmp_path); cfg.mode = "live"; cfg.auto_execute = False
+    mk = _LiveMarket()
+    bot.run_once(cfg, market=mk, strategy=_strat(Decision(action="buy", size=1.0)))
+    assert mk.orders == []                                  # NO create_order when deferred
+    pend = _json.loads((tmp_path / "pending.json").read_text())
+    assert pend["BTC/USDT"]["action"] == "buy"
+
+
+def test_shadow_auto_off_records_pending(tmp_path):
+    cfg = _cfg(tmp_path); cfg.mode = "shadow"; cfg.auto_execute = False
+    class ShadowMarket:
+        def make_exchange(self, name, mode="paper", api_key="", secret=""): return object()
+        def fetch_ohlcv_df(self, ex, sym, tf, limit=200): return _df()
+        def fetch_price(self, ex, sym): return 159.0
+        def fetch_balance(self, ex, symbols): return 5000.0, {s: 0.0 for s in symbols}
+    bot.run_once(cfg, market=ShadowMarket(), strategy=_strat(Decision(action="buy", size=1.0)))
+    pend = _json.loads((tmp_path / "pending.json").read_text())
+    assert pend["BTC/USDT"]["action"] == "buy"             # shadow proposes for the live-manual workflow
+
+
+def test_status_carries_auto_execute(tmp_path):
+    cfg = _cfg(tmp_path); cfg.auto_execute = True
+    bot.run_once(cfg, market=FakeMarket(), strategy=_strat(Decision(action="hold")))
+    data = _json.loads((tmp_path / "status.json").read_text())
+    assert data["auto_execute"] is True
