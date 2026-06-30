@@ -3,6 +3,7 @@ import { existsSync } from "fs";
 import { join, resolve } from "path";
 import { dataDir } from "../lib/snapshot";
 import { buildBacktestArgs, isIsoDate, BacktestOpts } from "../lib/backtest";
+import { pinnedEnv } from "../lib/spawn";
 
 export type RunResult = { ok: boolean; code: number | null; stderrTail: string };
 
@@ -17,8 +18,7 @@ export function runBacktest(opts: BacktestOpts): Promise<RunResult> {
     return Promise.resolve({ ok: false, code: null, stderrTail: `invalid since date: ${opts.since} (expected YYYY-MM-DD)` });
   }
   const repoRoot = resolve(dataDir(), "..");
-  const env = { ...process.env };
-  delete env.LIVE_TRADING_ARMED;          // a dashboard-launched process can never arm live
+  const env = pinnedEnv(process.env);     // LIVE_TRADING_ARMED pinned "no" — can never arm live (survives the engine's .env loader)
   return new Promise((resolveP) => {
     const child = spawn(pythonPath(repoRoot), buildBacktestArgs(opts), { cwd: repoRoot, env });
     let stderr = "";

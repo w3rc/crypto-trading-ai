@@ -37,7 +37,7 @@ The Electron **main process** (Node) gains the ability to spawn the Python engin
   - `repoRoot = resolve(dataDir(), "..")` (reuses `dataDir()` from `../lib/snapshot`).
   - `python` = `repoRoot/.venv/bin/python` if it exists (`fs.existsSync`), else `"python3"`.
   - Reject (`ok:false`) early if `!isIsoDate(opts.since)` — no spawn.
-  - `const env = { ...process.env }; delete env.LIVE_TRADING_ARMED;` — **defense in depth: a dashboard-launched process can never arm live.** (Backtest places no orders regardless.)
+  - `const env = pinnedEnv(process.env)` (a pure, unit-tested helper in `src/lib/spawn.ts`) — **pins `LIVE_TRADING_ARMED="no"` in the child env.** It is SET to `"no"`, not deleted: the engine's `load_dotenv` (`engine/env.py`) only loads a value from `.env` when the key is *absent* ("real env wins"), so deleting it would let a `.env` containing `LIVE_TRADING_ARMED=yes` re-arm a spawned `engine.bot`. Pinning it present-and-`"no"` survives that — a dashboard-launched process can never arm live. (Backtest places no orders regardless; this hardens the foundation Phase 2 reuses.)
   - `spawn(python, buildBacktestArgs(opts), { cwd: repoRoot, env })`; collect stderr (cap the tail at ~2 KB); resolve `{ ok: code === 0, code, stderrTail }` on `'close'`. On spawn `'error'` (e.g. python missing) resolve `{ ok:false, code:null, stderrTail: <message> }`.
   - `# ponytail: dev-local repoRoot/venv resolution; packaged-app python bundling is the deferred C1, out of scope.`
 - **`desktop/src/main/index.ts`**: add `ipcMain.handle("run-backtest", (_e, opts) => runBacktest(opts))` inside `whenReady` (beside the existing `snapshot` / `set-mode` handlers).
@@ -53,7 +53,7 @@ The Electron **main process** (Node) gains the ability to spawn the Python engin
 - **`desktop/src/renderer/src/index.css`**: minimal `.bt-form` layout (row of label+input, a primary button reusing the existing accent), `.bt-result` / error `<pre>` styling.
 
 ### Safety / scope
-- **No change to the live-trading safety model.** Backtest never places orders. The spawn env strips `LIVE_TRADING_ARMED`, so even Phase 2's "run the bot" controls (same foundation) can only ever paper/shadow — live stays operator-only via CLI/env. `create_order` and the two-switch gate are untouched.
+- **No change to the live-trading safety model.** Backtest never places orders. The spawn env pins `LIVE_TRADING_ARMED="no"` (present, not deleted — see above), so even Phase 2's "run the bot" controls (same foundation) can only ever paper/shadow even if `.env` contains an arm — live stays operator-only via CLI/env. `create_order` and the two-switch gate are untouched.
 - Dev-local only: `repoRoot`/venv are derived from `dataDir()`'s parent. Packaged-app python resolution is out of scope (deferred C1).
 
 ## Data flow
