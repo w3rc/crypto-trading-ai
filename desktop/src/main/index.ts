@@ -4,8 +4,10 @@ import { is } from "@electron-toolkit/utils";
 import { readSnapshot, dataDir } from "../lib/snapshot";
 import { writeControl } from "../lib/control";
 
+let mainWindow: BrowserWindow | null = null;
+
 function createWindow(): void {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 820,
     show: false,
@@ -17,24 +19,35 @@ function createWindow(): void {
     },
   });
 
-  win.on("ready-to-show", () => win.show());
+  mainWindow.on("ready-to-show", () => mainWindow?.show());
 
   if (is.dev && process.env["ELECTRON_RENDERER_URL"]) {
-    win.loadURL(process.env["ELECTRON_RENDERER_URL"]);
+    mainWindow.loadURL(process.env["ELECTRON_RENDERER_URL"]);
   } else {
-    win.loadFile(join(__dirname, "../renderer/index.html"));
+    mainWindow.loadFile(join(__dirname, "../renderer/index.html"));
   }
 }
 
-app.whenReady().then(() => {
-  ipcMain.handle("snapshot", () => readSnapshot(dataDir()));
-  ipcMain.handle("set-mode", (_e, mode: string) => writeControl(dataDir(), mode));
-  createWindow();
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+if (!app.requestSingleInstanceLock()) {
+  app.quit();                                   // a second launch hands off to the running one
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
   });
-});
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
-});
+  app.whenReady().then(() => {
+    ipcMain.handle("snapshot", () => readSnapshot(dataDir()));
+    ipcMain.handle("set-mode", (_e, mode: string) => writeControl(dataDir(), mode));
+    createWindow();
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
+  });
+
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
+  });
+}

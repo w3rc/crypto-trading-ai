@@ -26,6 +26,16 @@ test("parseDecisions tolerates empty input", () => {
   expect(parseDecisions("")).toEqual([]);
 });
 
+test("parseDecisions skips a torn line and keeps the rest", () => {
+  const text = [
+    JSON.stringify({ ts: "t1", symbol: "BTC/USDT", action: "hold", reason: "x", price: 1, executed: false }),
+    '{"ts":"t2","symbol":"ETH',                       // torn / half-written line
+    JSON.stringify({ ts: "t3", symbol: "ETH/USDT", action: "buy", reason: "y", price: 2, executed: true }),
+  ].join("\n");
+  const out = parseDecisions(text);
+  expect(out.map((d) => d.ts)).toEqual(["t1", "t3"]);   // bad line skipped, others kept
+});
+
 test("parseSentiment round-trips a snapshot", () => {
   const json = JSON.stringify({
     ts: "2026-06-26T00:00:00+00:00", strategy: "sentiment_rule",
