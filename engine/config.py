@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -84,6 +85,25 @@ def _mode_override(data_dir: str, default: str) -> str:
     return m if m in _VALID_MODES else default
 
 
+_SYMBOL_RE = re.compile(r"^[A-Z0-9]+/[A-Z0-9]+$")
+
+
+def _symbols_override(data_dir: str, default: list[str]) -> list[str]:
+    """A valid non-empty symbols list in <data_dir>/symbols.json overrides config; fail-safe to default."""
+    path = os.path.join(data_dir, "symbols.json")
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path) as f:
+            raw = json.load(f)
+    except (json.JSONDecodeError, OSError, ValueError):
+        return default
+    if not isinstance(raw, list):
+        return default
+    valid = [s for s in raw if isinstance(s, str) and _SYMBOL_RE.match(s)]
+    return valid or default
+
+
 def load_config(path: str = "engine/config.yaml") -> Config:
     with open(path) as f:
         raw = yaml.safe_load(f)
@@ -100,7 +120,7 @@ def load_config(path: str = "engine/config.yaml") -> Config:
     lev = max(1.0, lev)
     return Config(
         exchange=raw["exchange"],
-        symbols=list(raw["symbols"]),
+        symbols=_symbols_override(raw["data_dir"], list(raw["symbols"])),
         timeframe=raw["timeframe"],
         paper_capital=float(raw["paper_capital"]),
         fee_pct=float(raw["fee_pct"]),

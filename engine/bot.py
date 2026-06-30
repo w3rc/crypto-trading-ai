@@ -20,6 +20,7 @@ def _status_payload(cfg, ts, funding_accrued, last_funding_ts, halted=False):
         "halted": halted,
         "armed": _live_armed(),
         "interval_seconds": cfg.interval_seconds,
+        "symbols": list(cfg.symbols),
         "strategy": cfg.strategy,
         "exchange": cfg.exchange,
         "risk": {
