@@ -12,7 +12,7 @@ import Settings from "./components/Settings";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar, { type View } from "./components/Sidebar";
 
-const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [] };
+const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [], pending: {} };
 const api = (window as unknown as { api: { getSnapshot: () => Promise<Snapshot> } }).api;
 
 export default function App(): React.JSX.Element {

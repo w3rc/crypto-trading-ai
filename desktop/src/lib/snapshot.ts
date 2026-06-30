@@ -1,6 +1,6 @@
 import { readFile } from "fs/promises";
 import { join, resolve } from "path";
-import { parseTradesCsv, parseDecisions, parseSentiment, parseBacktestCsv, Snapshot, State, SentimentSnapshot, Status, BacktestPoint } from "./parse";
+import { parseTradesCsv, parseDecisions, parseSentiment, parseBacktestCsv, parsePending, Snapshot, State, SentimentSnapshot, Status, BacktestPoint, Pending } from "./parse";
 
 export function dataDir(): string {
   return process.env.DATA_DIR || resolve(process.cwd(), "..", "data");
@@ -21,5 +21,6 @@ export async function readSnapshot(dir: string): Promise<Snapshot> {
   const sentiment = await readOr<SentimentSnapshot | null>(join(dir, "sentiment.json"), null, parseSentiment);
   const status = await readOr<Status | null>(join(dir, "status.json"), null, (s) => JSON.parse(s) as Status);
   const backtest = await readOr<BacktestPoint[]>(join(dir, "backtest_equity.csv"), [], parseBacktestCsv);
-  return { state, trades, decisions, sentiment, status, backtest };
+  const pending = await readOr<Pending>(join(dir, "pending.json"), {}, (s) => parsePending(JSON.parse(s)));
+  return { state, trades, decisions, sentiment, status, backtest, pending };
 }
