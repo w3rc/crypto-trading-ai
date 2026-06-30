@@ -5,6 +5,10 @@ __pycache__/
 data/state.json
 data/trades.csv
 data/decisions.jsonl
+data/status.json
+data/control.json
+data/live_meta.json
+data/HALT
 data/bot.lock
 data/sentiment.json
 data/cache/

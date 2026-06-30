@@ -65,6 +65,10 @@ between **Overview** (account, equity curve, open positions, risk limits), **Pos
 **Activity** (decisions + trades), **Sentiment**, and **Backtest** (strategy vs buy-and-hold from
 `data/backtest_equity.csv`). The sidebar shows data **freshness** ("updated 8s ago") and flips to **STALE · updated Xm ago** (a stopped bot) when the last `status.json` is older than ~2.5× `interval_seconds` (set this in `config.yaml` to match your cron cadence). It also shows a **brain-health** chip (OK / DEGRADED) derived from the latest decisions, and the decision log collapses repeated identical reasons into one `×N` row. It reads the same `data/*.json` snapshots the bot writes each cycle.
 
+The desktop app is single-instance (a second launch focuses the running window). Runtime files in
+`data/` (`state.json`, `status.json`, `control.json`, `live_meta.json`, `HALT`, …) are gitignored — a
+corrupt `state.json` is backed up to `state.json.corrupt` and the bot stops loudly rather than resetting.
+
 The **Sentiment** view renders per symbol: the blended score (Fear/Greed label + gauge), the per-source breakdown (`F&G` / `news` / `reddit` / `X`, with `—` for sources without a key), and the active strategy. It reads `data/sentiment.json`, which the bot writes each cycle.
 
 Sources (each fail-safe — a missing key or dead API just drops that source):
