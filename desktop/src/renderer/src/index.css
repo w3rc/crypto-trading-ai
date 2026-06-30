@@ -128,3 +128,13 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
   color: var(--text); font: inherit; padding: 7px 10px; width: 150px; }
 .error-fallback .muted { color: var(--muted); margin: 4px 0 0; }
 .error-fallback pre { white-space: pre-wrap; color: var(--down); font-size: 13px; margin: 10px 0; }
+.pending-panel { border-left: 3px solid var(--accent, #4f8cff); }
+.pending-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; flex-wrap: wrap; }
+.pending-sym { font-weight: 600; min-width: 92px; }
+.pending-side { font-weight: 700; padding: 2px 8px; border-radius: 6px; font-size: 12px; }
+.pending-side.buy { color: var(--up, #2ecc71); background: rgba(46, 204, 113, 0.12); }
+.pending-side.sell { color: var(--down, #e74c3c); background: rgba(231, 76, 60, 0.12); }
+.pending-reason { flex: 1; color: var(--muted, #8a93a6); font-size: 13px; }
+.bt-ghost { background: transparent; border: 1px solid var(--border, #2a3346); color: var(--muted, #8a93a6);
+            border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.bt-ghost:disabled { opacity: 0.5; cursor: default; }
