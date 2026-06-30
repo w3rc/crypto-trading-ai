@@ -33,7 +33,7 @@ export default function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <Sidebar status={snap.status} state={snap.state} view={view} onNavigate={setView} decisions={snap.decisions} />
+      <Sidebar status={snap.status} view={view} onNavigate={setView} decisions={snap.decisions} />
       <main className="main">
         {view === "overview" && <Overview snap={snap} />}
         {view === "positions" && (
@@ -58,23 +58,29 @@ function Overview({ snap }: { snap: Snapshot }): React.JSX.Element {
   const start = eq && eq.length ? eq[0].equity : equity;
   const pnl = equity - start;
   return (
-    <div className="grid">
-      <section className="card">
-        <h2>Account</h2>
-        <div className="kpis">
-          <div className="kpi"><div className="label">Equity</div><div className="value">${equity.toFixed(2)}</div></div>
-          <div className="kpi"><div className="label">Cash</div><div className="value">${cash.toFixed(2)}</div></div>
-          <div className="kpi"><div className="label">P&amp;L</div>
-            <div className="value" style={{ color: pnl >= 0 ? "var(--up)" : "var(--down)" }}>
-              {pnl >= 0 ? "+$" : "−$"}{Math.abs(pnl).toFixed(2)}
-            </div>
+    <>
+      <div className="kpi-row">
+        <section className="card kpi">
+          <div className="label">Equity</div>
+          <div className="value">${equity.toFixed(2)}</div>
+        </section>
+        <section className="card kpi">
+          <div className="label">Cash</div>
+          <div className="value">${cash.toFixed(2)}</div>
+        </section>
+        <section className="card kpi">
+          <div className="label">P&amp;L</div>
+          <div className="value" style={{ color: pnl >= 0 ? "var(--up)" : "var(--down)" }}>
+            {pnl >= 0 ? "+$" : "−$"}{Math.abs(pnl).toFixed(2)}
           </div>
-        </div>
-      </section>
-      <section className="card"><h2>Equity curve</h2><EquityChart history={eq ?? []} /></section>
-      <section className="card"><h2>Open positions</h2><PositionsTable state={snap.state} /></section>
-      <section className="card"><h2>Risk</h2><RiskCard status={snap.status} /></section>
-    </div>
+        </section>
+      </div>
+      <div className="grid">
+        <section className="card"><h2>Equity curve</h2><EquityChart history={eq ?? []} /></section>
+        <section className="card"><h2>Open positions</h2><PositionsTable state={snap.state} /></section>
+        <section className="card"><h2>Risk</h2><RiskCard status={snap.status} /></section>
+      </div>
+    </>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { State, Status, Decision } from "../../../lib/parse";
+import type { Status, Decision } from "../../../lib/parse";
 import { modeBadge, freshness, brainHealth } from "../../../lib/status";
 
 export type View = "overview" | "positions" | "activity" | "sentiment" | "backtest";
@@ -20,9 +20,8 @@ const MODES: { id: string; label: string }[] = [
 
 const api = (window as unknown as { api: { setMode?: (m: string) => Promise<void> } }).api;
 
-export default function Sidebar({ status, state, view, onNavigate, decisions }: {
+export default function Sidebar({ status, view, onNavigate, decisions }: {
   status: Status | null;
-  state: State | null;
   view: View;
   onNavigate: (v: View) => void;
   decisions: Decision[];
@@ -30,11 +29,6 @@ export default function Sidebar({ status, state, view, onNavigate, decisions }: 
   const badge = modeBadge(status?.mode, status?.halted, status?.armed);
   const fresh = freshness(status, Date.now());   // re-evaluated on every 5s poll re-render
   const brain = brainHealth(decisions);
-  const cash = state?.cash ?? 0;
-  const eq = state?.equity_history;
-  const equity = eq && eq.length ? eq[eq.length - 1].equity : cash;
-  const start = eq && eq.length ? eq[0].equity : equity;
-  const pnl = equity - start;
 
   const current = status?.mode ?? "paper";
   const [pending, setPending] = useState<string | null>(null);
@@ -72,13 +66,6 @@ export default function Sidebar({ status, state, view, onNavigate, decisions }: 
         </div>
       )}
 
-      <div className="rail-acct">
-        <div className="rail-eq">${equity.toFixed(2)}</div>
-        <div className="rail-pnl" style={{ color: pnl >= 0 ? "var(--up)" : "var(--down)" }}>
-          {pnl >= 0 ? "+$" : "−$"}{Math.abs(pnl).toFixed(2)}
-        </div>
-      </div>
-
       <nav className="rail-nav">
         {NAV.map((n) => (
           <button
@@ -110,8 +97,6 @@ export default function Sidebar({ status, state, view, onNavigate, decisions }: 
 
       <div className="rail-foot">
         {status ? `${status.exchange} · ${status.strategy}` : "—"}
-        <br />
-        polls 5s
       </div>
     </aside>
   );

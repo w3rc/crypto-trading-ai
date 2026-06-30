@@ -21,7 +21,7 @@ body {
   box-shadow: 0 8px 30px rgba(0,0,0,0.25);
 }
 .card h2 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
-.kpis { display: flex; gap: 28px; flex-wrap: wrap; }
+.kpi-row { display: grid; gap: 18px; margin-top: 20px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
 .kpi .label { color: var(--muted); font-size: 12px; }
 .kpi .value { font-size: 26px; font-weight: 700; margin-top: 2px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -67,8 +67,6 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .mode-shadow { color: var(--mode-shadow); }
 .mode-live { color: var(--mode-live); background: rgba(245,158,11,0.15); }
 .mode-halted { color: var(--mode-halted); background: rgba(248,113,113,0.12); }
-.rail-eq { font-size: 24px; font-weight: 700; }
-.rail-pnl { font-size: 14px; font-weight: 600; margin-top: 2px; }
 .rail-nav { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .rail-link { text-align: left; background: none; border: none; color: var(--muted);
   font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
@@ -81,7 +79,6 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
   .sidebar { width: auto; flex: none; height: auto; position: static;
     flex-direction: row; flex-wrap: wrap; align-items: center; gap: 10px 14px;
     border-right: none; border-bottom: 1px solid var(--glass-border); }
-  .rail-acct { margin-left: auto; text-align: right; }
   .rail-nav { flex-direction: row; flex-wrap: wrap; margin-top: 0; width: 100%; }
   .rail-foot { margin-top: 0; width: 100%; }
 }
