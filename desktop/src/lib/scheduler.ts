@@ -6,7 +6,7 @@ export type Schedule = { enabled: boolean; intervalSeconds: number };
 export const DEFAULT_SCHEDULE: Schedule = { enabled: false, intervalSeconds: 900 };
 
 export function clampInterval(n: number): number {
-  return Math.max(60, Math.round(n) || 900);   // floor 60s; 0/NaN -> 900
+  return Math.max(60, (isFinite(n) && Math.round(n)) || 900);   // floor 60s; 0/NaN/Infinity -> 900
 }
 
 export function parseSchedule(raw: unknown): Schedule {
@@ -21,7 +21,7 @@ export async function readSchedule(dir: string): Promise<Schedule> {
   try {
     return parseSchedule(JSON.parse(await readFile(schedulePath(dir), "utf8")));
   } catch {
-    return DEFAULT_SCHEDULE;   // missing/corrupt -> off
+    return { ...DEFAULT_SCHEDULE };   // missing/corrupt -> off (fresh copy; never hand out the shared singleton)
   }
 }
 

@@ -7,9 +7,10 @@ test("clampInterval floors at 60 and rounds", () => {
   expect(clampInterval(120.6)).toBe(121);  // rounds
 });
 
-test("clampInterval falls back to 900 for 0 / NaN", () => {
+test("clampInterval falls back to 900 for 0 / NaN / Infinity", () => {
   expect(clampInterval(0)).toBe(900);
   expect(clampInterval(NaN)).toBe(900);
+  expect(clampInterval(Infinity)).toBe(900);   // never an interval that won't tick
 });
 
 test("parseSchedule coerces valid input", () => {
