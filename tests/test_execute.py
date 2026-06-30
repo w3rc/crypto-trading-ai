@@ -2,8 +2,8 @@ import json as _json
 import pandas as pd
 from engine import execute
 from engine.config import Config, RiskConfig, LLMConfig, SentimentConfig
-from engine.models import Decision, Fill
-from engine.state import save_pending, load_state
+from engine.models import Decision, Fill, Position
+from engine.state import save_pending, load_state, save_state_atomic, State
 
 
 # self-contained fakes (tests/ is not a package — do not import from test_bot)
@@ -42,10 +42,6 @@ class _LiveMarket:
     def create_order(self, ex, sym, side, qty, ref_price, ts):
         self.orders.append((sym, side, qty))
         return Fill(sym, side, qty, ref_price, qty * ref_price * 0.001, ts)
-
-
-def _strat(decision):
-    return lambda features, position, cash, cfg: decision
 
 
 def _seed_pending(tmp_path, sym="BTC/USDT", action="buy", size=1.0):
@@ -94,3 +90,27 @@ def test_execute_live_armed_places_real_order(tmp_path, monkeypatch):
     assert len(mk.orders) == 1 and mk.orders[0][1] == "buy"  # a REAL order placed
     pend = _json.loads((tmp_path / "pending.json").read_text())
     assert "BTC/USDT" not in pend
+
+
+def test_execute_noop_returns_nonzero(tmp_path):
+    """Paper mode, pending buy, but cash=0.0 → plan_order returns None → no fill → exit 5."""
+    cfg = _cfg(tmp_path); cfg.mode = "paper"; cfg.auto_execute = False
+    _seed_pending(tmp_path)
+    # Seed state with cash=0.0 so plan_order yields no order and no trade is written.
+    state = State(cash=0.0, positions={"BTC/USDT": Position("BTC/USDT")})
+    save_state_atomic(state, str(tmp_path))
+    code = execute.main("BTC/USDT", cfg=cfg, market=FakeMarket())
+    assert code == 5
+    assert not (tmp_path / "trades.csv").exists()
+
+
+def test_execute_guard_messages_go_to_stderr(tmp_path, monkeypatch, capsys):
+    """Live mode unarmed → exit 3, and the reason message must appear on stderr, not stdout."""
+    monkeypatch.delenv("LIVE_TRADING_ARMED", raising=False)
+    cfg = _cfg(tmp_path); cfg.mode = "live"
+    _seed_pending(tmp_path)
+    code = execute.main("BTC/USDT", cfg=cfg, market=_LiveMarket())
+    assert code == 3
+    captured = capsys.readouterr()
+    assert "LIVE_TRADING_ARMED" in captured.err
+    assert captured.out == ""

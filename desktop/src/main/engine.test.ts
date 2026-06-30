@@ -1,4 +1,4 @@
-import { vi, test, expect, beforeEach } from "vitest";
+import { vi, test, expect, beforeEach, afterEach } from "vitest";
 
 const spawnMock = vi.fn();
 vi.mock("child_process", () => ({ spawn: (...a: unknown[]) => spawnMock(...a) }));
@@ -13,6 +13,7 @@ function fakeChild() {
 }
 
 beforeEach(() => { spawnMock.mockReset(); spawnMock.mockReturnValue(fakeChild()); });
+afterEach(() => { delete process.env.LIVE_TRADING_ARMED; });
 
 test("executeSuggestion inherits the real LIVE_TRADING_ARMED (NOT pinned to 'no')", async () => {
   process.env.LIVE_TRADING_ARMED = "yes";
