@@ -50,21 +50,24 @@ user clicks Execute on ETH/USDT:
 - `save_pending(pending: dict, data_dir) -> None` — atomic write.
 
 **`engine/bot.py`**
-- `_apply_pending(pending, sym, order, decision, price, ts, deferred)` — the single shared rule:
-  - `if deferred and order is not None:` `pending[sym] = {"ts": ts, "action": order.side, "size": decision.size, "reason": decision.reason, "price": price}`
+- `_record_pending(pending, sym, order, decision, price, ts)` — set/clear a deferred suggestion:
+  - `if order is not None:` `pending[sym] = {"ts": ts, "action": order.side, "size": decision.size, "reason": decision.reason, "price": price}`
   - `else:` `pending.pop(sym, None)`
 - `run_once(cfg=None, market=None, strategy=None, only_symbol=None, forced_decision=None)`:
-  - paper block (and `_run_live`): at cycle start `pending = state_mod.load_pending(cfg.data_dir)`; per symbol skip if `only_symbol and sym != only_symbol`.
-  - Decision selection order (safety first): `force_close` → else `forced_decision` (if not None) → else `strategy(...)`.
-  - `deferred = forced_decision is None and not cfg.auto_execute`. When `deferred`: `append_decision(executed=False)`, `_apply_pending(..., deferred=True)`, `continue` (no fill). When not deferred: execute as today, then `_apply_pending(..., deferred=False)` (clears the entry).
+  - paper block (and `_run_live`): at cycle start `pending = state_mod.load_pending(cfg.data_dir)`; per symbol skip if `only_symbol is not None and sym != only_symbol`.
+  - Decision/deferral order (safety first):
+    - **`force_close` (stop-loss / liquidation) fires → always execute, never defer**; then `pending.pop(sym, None)`.
+    - else `decision = forced_decision if forced_decision is not None else strategy(...)`; `order = plan_order(decision, …)`.
+      - **Defer only here:** `if forced_decision is None and not cfg.auto_execute:` `append_decision(executed=False)`, `_record_pending(pending, sym, order, decision, price, ts)`, `continue` (no fill).
+      - else `pending.pop(sym, None)`; execute as today.
   - At cycle end `state_mod.save_pending(pending, cfg.data_dir)`.
-- `_run_shadow(cfg, market, strategy)` — same pending rule (`forced_decision` never reaches shadow; `engine.execute` guards it out). Under auto-OFF it defers (writes pending so the live-manual workflow has suggestions); under auto-ON it clears.
+- `_run_shadow(cfg, market, strategy)` — shadow never executes and has no `force_close`; under auto-OFF it `_record_pending` (writes pending so the live-manual workflow has suggestions), under auto-ON it `pending.pop(sym, None)`. `forced_decision` never reaches shadow (`engine.execute` guards it out).
 - `_status_payload` adds `"auto_execute": cfg.auto_execute` (after `"armed"`).
 
 **`engine/execute.py`** (new) — `python -m engine.execute "ETH/USDT"`:
 1. `load_dotenv()`; `cfg = load_config()`.
 2. Mode guard: `cfg.mode == "shadow"` → print + exit **2**; `cfg.mode == "live" and not _live_armed()` → print + exit **3**; `pending.get(symbol)` missing → print + exit **4**; missing argv → exit **1**.
-3. Build `Decision(action=p["action"], size=float(p.get("size", 1.0)), reason=p.get("reason", ""))` and call `run_once(cfg=cfg, only_symbol=symbol, forced_decision=decision)`. `forced_decision` skips the strategy call (no re-decide, no LLM spend) and bypasses the defer branch, so it executes through the same code; `_apply_pending(deferred=False)` clears the entry. Exit **0**.
+3. Build `Decision(action=p["action"], size=float(p.get("size", 1.0)), reason=p.get("reason", ""))` and call `run_once(cfg=cfg, only_symbol=symbol, forced_decision=decision)`. `forced_decision` skips the strategy call (no re-decide, no LLM spend) and bypasses the defer branch, so it executes through the same code; the non-deferred `pending.pop(sym, None)` clears the entry. Exit **0**.
 
 Edge: a forced decision that `plan_order` reduces to no order (e.g. insufficient cash) → `order is None` → entry cleared, `append_decision(executed=False)` records why; no trade. Acceptable (the Activity log explains it).
 
@@ -112,7 +115,7 @@ Edge: a forced decision that `plan_order` reduces to no order (e.g. insufficient
 
 ## Testing
 
-- **pytest:** `_auto_execute_override` (default / valid true+false / non-bool / missing-file / corrupt); `run_once` paper with `auto_execute=False` records pending + appends `executed=False` + places no fill; `_run_live` with `auto_execute=False` records pending + never calls `create_order`; `engine.execute` forced path executes a paper fill (stubbed market — asserts the stored decision is used, not the strategy) and clears pending; the mode guards return exit 2 / 3 / 4; `force_close` pre-empts a `forced_decision`; `_status_payload` carries `auto_execute`; `load_pending`/`save_pending` round-trip + corrupt → `{}`.
+- **pytest:** `_auto_execute_override` (default / valid true+false / non-bool / missing-file / corrupt); `run_once` paper with `auto_execute=False` records pending + appends `executed=False` + places no fill; `_run_live` with `auto_execute=False` records pending + never calls `create_order`; `engine.execute` forced path executes a paper fill (stubbed market — asserts the stored decision is used, not the strategy) and clears pending; the mode guards return exit 2 / 3 / 4; a stop-loss `force_close` still **executes (never defers)** when `auto_execute=False`; `force_close` pre-empts a `forced_decision`; `_status_payload` carries `auto_execute`; `load_pending`/`save_pending` round-trip + corrupt → `{}`.
 - **vitest (`src/lib`):** `parsePending` (keeps valid, drops malformed); `removePending` (removes one key, preserves others, missing file → `{}`); `control.ts` merge (`writeControl` preserves `auto_execute`; `writeAutoExecute` preserves `mode`); `snapshot` parses `pending.json`.
 - **Keystone safety test (`engine.test.ts` / `spawn`):** `executeSuggestion` spawns with an env where `LIVE_TRADING_ARMED` is **not** forced to `"no"` (inherits `process.env`), while `runBot` does pin it `"no"`. This guards the carve-out and must fail if anyone routes execute through the pinned spawn.
 - **build:** `npm run build` exit 0.
