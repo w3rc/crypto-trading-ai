@@ -13,6 +13,23 @@ const api = (window as unknown as {
   };
 }).api;
 
+function Toggle({ checked, onChange, name, help }: {
+  checked: boolean; onChange: (on: boolean) => void; name: string; help: string;
+}): React.JSX.Element {
+  return (
+    <label className="switch-row">
+      <span className="switch">
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+        <span className="switch-slider" />
+      </span>
+      <span className="switch-label">
+        <span className="switch-name">{name}</span>
+        <span className="switch-help">{help}</span>
+      </span>
+    </label>
+  );
+}
+
 export default function Settings({ status }: { status: Status | null }): React.JSX.Element {
   const [enabled, setEnabled] = useState(false);
   const [intervalSeconds, setIntervalSeconds] = useState(900);
@@ -63,35 +80,36 @@ export default function Settings({ status }: { status: Status | null }): React.J
   };
 
   return (
-    <div className="settings-form">
-      <label className="settings-row">
-        <input type="checkbox" checked={autoExec} onChange={(e) => toggleAuto(e.target.checked)} />
-        Auto-execute trades — when off, the bot only proposes; you Execute/Dismiss each suggestion. In live mode an Execute places a real order.
-      </label>
-      <label className="settings-row">
-        <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-        Run the bot on a schedule (while this app is open)
-      </label>
-      <label className="settings-row">
-        Interval (seconds)
-        <input type="number" min={60} max={86400} value={intervalSeconds}
-               onChange={(e) => setIntervalSeconds(Number(e.target.value))} />
-      </label>
-      <div className="settings-actions">
-        <button className="bt-run" onClick={save}>Save schedule</button>
-        <button className="bt-run" disabled={running} onClick={runNow}>{running ? "Running…" : "Run now"}</button>
-      </div>
-      {saved && (
-        <div className="settings-summary">
-          {saved.enabled ? `Scheduler on — every ${saved.intervalSeconds}s` : "Scheduler off"} · keep the interval near
-          {" "}config.interval_seconds for accurate freshness.
+    <div className="settings">
+      <section className="settings-group">
+        <div className="settings-group-title">Execution</div>
+        <Toggle checked={autoExec} onChange={toggleAuto} name="Auto-execute trades"
+                help="When off, the bot only proposes — you Execute or Dismiss each suggestion. In live mode, Execute places a real order." />
+      </section>
+
+      <section className="settings-group">
+        <div className="settings-group-title">Scheduler</div>
+        <Toggle checked={enabled} onChange={setEnabled} name="Run automatically on a timer"
+                help="Runs a trading cycle every interval while this app is open. Save to apply." />
+        <label className="field-row">
+          <span className="field-label">Interval (seconds)</span>
+          <input type="number" min={60} max={86400} value={intervalSeconds}
+                 onChange={(e) => setIntervalSeconds(Number(e.target.value))} />
+        </label>
+        <div className="settings-actions">
+          <button className="bt-run" onClick={save}>Save schedule</button>
+          <button className="bt-run" disabled={running} onClick={runNow}>{running ? "Running…" : "Run now"}</button>
         </div>
-      )}
-      {saveMsg && <div className="bt-result bt-error">{saveMsg}</div>}
-      {result && result.ok && <div className="bt-result">Bot cycle complete — dashboard updating…</div>}
-      {result && !result.ok && (
-        <div className="bt-result bt-error">Bot run failed<pre>{result.stderrTail || "(no output)"}</pre></div>
-      )}
+        <div className="settings-summary">
+          {saved ? (saved.enabled ? `On — a cycle every ${saved.intervalSeconds}s.` : "Off — cycles only when you click Run now.") : ""}
+          {" "}Match your bot's configured cycle time so the freshness indicator stays accurate.
+        </div>
+        {saveMsg && <div className="bt-result bt-error">{saveMsg}</div>}
+        {result && result.ok && <div className="bt-result">Bot cycle complete — dashboard refreshed.</div>}
+        {result && !result.ok && (
+          <div className="bt-result bt-error">Bot run failed<pre>{result.stderrTail || "(no output)"}</pre></div>
+        )}
+      </section>
     </div>
   );
 }
