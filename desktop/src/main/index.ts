@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { join } from "path";
 import { is } from "@electron-toolkit/utils";
 import { readSnapshot, dataDir } from "../lib/snapshot";
@@ -59,6 +59,9 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle("execute-suggestion", (_e, sym: string) => executeSuggestion(sym));
     ipcMain.handle("dismiss-suggestion", (_e, sym: string) => removePending(dataDir(), sym));
     ipcMain.handle("set-auto-execute", (_e, on: boolean) => writeAutoExecute(dataDir(), on));
+    ipcMain.handle("open-external", (_e, url: string) => {   // https-only: don't shell out arbitrary schemes
+      if (typeof url === "string" && url.startsWith("https://")) return shell.openExternal(url);
+    });
     readSchedule(dataDir()).then(applySchedule);   // arm the schedule on startup
     createWindow();
     app.on("activate", () => {

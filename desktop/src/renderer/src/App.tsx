@@ -12,6 +12,7 @@ import Settings from "./components/Settings";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar, { type View } from "./components/Sidebar";
 import PendingPanel from "./components/PendingPanel";
+import SymbolManager from "./components/SymbolManager";
 
 const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [], pending: {} };
 const api = (window as unknown as { api: { getSnapshot: () => Promise<Snapshot> } }).api;
@@ -49,6 +50,9 @@ export default function App(): React.JSX.Element {
               </section>
             </div>
           )}
+          {view === "pairs" && (
+            <section className="card"><h2>Trading pairs</h2><SymbolManager status={snap.status} state={snap.state} /></section>
+          )}
           {view === "activity" && <Activity snap={snap} />}
           {view === "sentiment" && (
             <section className="card"><h2>Sentiment</h2><SentimentPanel sentiment={snap.sentiment} /></section>
@@ -57,7 +61,7 @@ export default function App(): React.JSX.Element {
             <section className="card"><h2>Backtest</h2><BacktestForm /><BacktestChart points={snap.backtest} /></section>
           )}
           {view === "settings" && (
-            <section className="card"><h2>Settings</h2><Settings status={snap.status} state={snap.state} /></section>
+            <section className="card"><h2>Settings</h2><Settings status={snap.status} /></section>
           )}
         </ErrorBoundary>
       </main>
