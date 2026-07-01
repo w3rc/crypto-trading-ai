@@ -33,15 +33,20 @@ function createWindow(): void {
   }
 }
 
-if (!app.requestSingleInstanceLock()) {
+// Single-instance is a production concern. In dev, skip the lock so electron-vite's
+// hot-restart on a main-process change can actually replace the running app — otherwise
+// the new instance quits on the held lock and the stale main lingers (forcing manual restarts).
+if (!is.dev && !app.requestSingleInstanceLock()) {
   app.quit();                                   // a second launch hands off to the running one
 } else {
-  app.on("second-instance", () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
-  });
+  if (!is.dev) {
+    app.on("second-instance", () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+      }
+    });
+  }
 
   app.whenReady().then(() => {
     ipcMain.handle("snapshot", () => readSnapshot(dataDir()));
