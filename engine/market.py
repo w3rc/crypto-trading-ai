@@ -50,8 +50,8 @@ def fetch_balance(exchange, symbols: list[str]) -> tuple[float, dict[str, float]
     def free(asset: str) -> float:
         return float((bal.get(asset) or {}).get("free", 0.0) or 0.0)
 
-    quote = symbols[0].split("/")[1] if symbols else "USDT"
-    # ponytail: assumes one shared quote across symbols (USDT); multi-quote is a later refinement.
+    quote = symbols[0].split("/")[1] if symbols else "USDC"
+    # ponytail: assumes one shared quote across symbols (symbols[0]'s quote); multi-quote is a later refinement.
     cash = free(quote)
     qty = {s: free(s.split("/")[0]) for s in symbols}
     return cash, qty

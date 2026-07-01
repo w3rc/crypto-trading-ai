@@ -11,7 +11,7 @@ auto_execute: false   # OFF = bot proposes; you Execute/Dismiss each trade. Dash
 # Credentials come from env (the desktop Settings panel injects them; or set them in .env):
 #   Hyperliquid: HYPERLIQUID_WALLET_ADDRESS / HYPERLIQUID_PRIVATE_KEY  (use an AGENT wallet — trade-only, no withdrawals)
 #   Binance:     EXCHANGE_API_KEY / EXCHANGE_API_SECRET
-#   EXCHANGE_TESTNET=1 routes shadow/live to the exchange testnet. Override the env-var NAMES with
+#   Absent = MAINNET; EXCHANGE_TESTNET=1 routes shadow/live to the exchange testnet. Override the env-var NAMES with
 #   exchange_wallet_env / exchange_private_key_env / exchange_api_key_env / exchange_secret_env if needed.
 interval_seconds: 900  # seconds between cron cycles; the dashboard flags STALE past ~2.5x this
 risk:
