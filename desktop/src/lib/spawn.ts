@@ -9,3 +9,29 @@
 export function pinnedEnv(base: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return { ...base, LIVE_TRADING_ARMED: "no" };
 }
+
+import { join } from "path";
+
+// Resolve the Python interpreter for the engine, preferring a project .venv — cross-platform.
+// Windows venvs live at .venv\Scripts\python.exe (fallback `python`); POSIX at .venv/bin/python
+// (fallback `python3`). The old code only knew the POSIX layout, so on Windows it fell through to
+// a depless global `python3` → "ModuleNotFoundError: No module named 'ccxt'".
+export function resolvePython(
+  repoRoot: string,
+  platform: NodeJS.Platform,
+  exists: (p: string) => boolean,
+): string {
+  if (platform === "win32") {
+    const venv = join(repoRoot, ".venv", "Scripts", "python.exe");
+    return exists(venv) ? venv : "python";
+  }
+  const venv = join(repoRoot, ".venv", "bin", "python");
+  return exists(venv) ? venv : "python3";
+}
+
+// A fresh clone that skipped `pip install` crashes on the first import. Show the fix, not a traceback.
+export function depHint(stderrTail: string): string {
+  return /ModuleNotFoundError: No module named/.test(stderrTail)
+    ? "Python dependencies not installed — run  pip install -r requirements.txt  in a .venv in the project folder."
+    : stderrTail;
+}
