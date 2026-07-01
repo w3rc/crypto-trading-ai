@@ -55,6 +55,7 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .muted { color: var(--muted); } .right { text-align: right; }
 .empty { color: var(--muted); padding: 18px 0; }
 .chartbox { height: 280px; }
+.sent-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .sent-row { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
 .sent-row:last-of-type { border-bottom: none; }
 .sent-head { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; }

@@ -48,6 +48,10 @@ export function runBot(): Promise<RunResult> {
   return spawnEngine(["-m", "engine.bot"]);
 }
 
+export function runSentiment(): Promise<RunResult> {
+  return spawnEngine(["-m", "engine.analyze_sentiment"]);   // sentiment-only; no trading, pinned
+}
+
 export function executeSuggestion(symbol: string): Promise<RunResult> {
   return spawnEngineArmed(["-m", "engine.execute", symbol]);
 }

@@ -7,6 +7,7 @@ const api = {
   getBacktestRun: (id: string) => ipcRenderer.invoke("get-backtest-run", id),
   clearBacktestHistory: () => ipcRenderer.invoke("clear-backtest-history"),
   runBot: () => ipcRenderer.invoke("run-bot"),
+  runSentiment: () => ipcRenderer.invoke("run-sentiment"),
   getSchedule: () => ipcRenderer.invoke("get-schedule"),
   setSchedule: (s: { enabled: boolean; intervalSeconds: number }) => ipcRenderer.invoke("set-schedule", s),
   setSymbols: (list: string[]) => ipcRenderer.invoke("set-symbols", list),
