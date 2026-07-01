@@ -162,7 +162,9 @@ def _run_shadow(cfg, market, strategy) -> None:
     """Dry-run against the REAL account: read balance + price, log the order we WOULD place, execute nothing."""
     with state_mod.acquire_lock(cfg.data_dir):
         exchange = market.make_exchange(cfg.exchange, cfg.mode,
-                                        cfg.exchange_api_key, cfg.exchange_secret)
+                                        cfg.exchange_api_key, cfg.exchange_secret,
+                                        wallet=cfg.exchange_wallet, private_key=cfg.exchange_private_key,
+                                        testnet=cfg.testnet)
         if cfg.risk.allow_short is None:
             cfg.risk.allow_short = market_mod.supports_short(exchange)
         ts = _now()
@@ -279,7 +281,9 @@ def _run_live(cfg, market, strategy, only_symbol=None, forced_decision=None) -> 
 
         print(f"[LIVE] placing real orders on {cfg.exchange}")
         exchange = market.make_exchange(cfg.exchange, "live",
-                                        cfg.exchange_api_key, cfg.exchange_secret)
+                                        cfg.exchange_api_key, cfg.exchange_secret,
+                                        wallet=cfg.exchange_wallet, private_key=cfg.exchange_private_key,
+                                        testnet=cfg.testnet)
         if cfg.risk.allow_short is None:
             cfg.risk.allow_short = market_mod.supports_short(exchange)
         bd = (sentiment_mod.breakdown(cfg.symbols, cfg) if cfg.sentiment.enabled else {})

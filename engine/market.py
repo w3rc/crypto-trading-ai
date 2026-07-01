@@ -17,12 +17,20 @@ def supports_short(exchange) -> bool:
     return options.get("defaultType", "spot") in _DERIVATIVE_TYPES
 
 
-def make_exchange(name: str, mode: str = "paper", api_key: str = "", secret: str = ""):
+def make_exchange(name: str, mode: str = "paper", api_key: str = "", secret: str = "",
+                  *, wallet: str = "", private_key: str = "", testnet: bool = False):
     opts = {"enableRateLimit": True}
     if mode in ("shadow", "live"):
-        opts["apiKey"] = api_key
-        opts["secret"] = secret
-    return getattr(ccxt, name)(opts)
+        if name == "hyperliquid":                 # DEX: wallet address + agent-wallet private key
+            opts["walletAddress"] = wallet
+            opts["privateKey"] = private_key
+        else:                                      # CEX: api key + secret
+            opts["apiKey"] = api_key
+            opts["secret"] = secret
+    ex = getattr(ccxt, name)(opts)
+    if testnet:                                    # public + private URLs -> the exchange's testnet
+        ex.set_sandbox_mode(True)
+    return ex
 
 
 def fetch_ohlcv_df(exchange, symbol: str, timeframe: str, limit: int = 200) -> pd.DataFrame:

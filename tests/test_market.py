@@ -47,6 +47,29 @@ def test_make_exchange_paper_has_no_credentials():
     assert not ex.apiKey                        # "" / None -> falsy
 
 
+def test_make_exchange_hyperliquid_live_loads_wallet_creds():
+    ex = market.make_exchange("hyperliquid", "live", wallet="0xabc", private_key="0xpk")
+    assert ex.walletAddress == "0xabc"
+    assert ex.privateKey == "0xpk"
+
+
+def test_make_exchange_binance_live_loads_api_creds():
+    ex = market.make_exchange("binance", "live", "KEY", "SEC")
+    assert ex.apiKey == "KEY"
+    assert ex.secret == "SEC"
+
+
+def test_make_exchange_paper_has_no_hl_credentials():
+    ex = market.make_exchange("hyperliquid")   # paper -> keyless public data
+    assert not getattr(ex, "walletAddress", "")
+    assert not getattr(ex, "privateKey", "")
+
+
+def test_make_exchange_testnet_uses_sandbox_urls():
+    ex = market.make_exchange("hyperliquid", "live", wallet="0xabc", private_key="0xpk", testnet=True)
+    assert "testnet" in str(ex.urls["api"])
+
+
 class BalanceExchange:
     def fetch_balance(self):
         return {"USDT": {"free": 5000.0, "used": 0.0, "total": 5000.0},
