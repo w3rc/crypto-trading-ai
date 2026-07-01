@@ -22,4 +22,4 @@ def test_reports_failure_when_fetch_raises(monkeypatch, capsys):
     def boom(ex, syms): raise RuntimeError("401 unauthorized")
     monkeypatch.setattr(test_connection.market, "fetch_balance", boom)
     assert test_connection.main() == 1
-    assert "401" in capsys.readouterr().out
+    assert "401" in capsys.readouterr().err

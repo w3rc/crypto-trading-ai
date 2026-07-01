@@ -15,7 +15,7 @@ def main() -> int:
                                   testnet=cfg.testnet)
         cash, _ = market.fetch_balance(ex, cfg.symbols)
     except Exception as e:                       # bad key / network / auth -> reported, never raised
-        print(f"connection FAILED: {e}")
+        print(f"connection FAILED: {e}", file=sys.stderr)
         return 1
     net = "testnet" if cfg.testnet else "mainnet"
     print(f"connection ok — {cfg.exchange} ({net}); available quote balance: {cash}")
