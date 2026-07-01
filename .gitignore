@@ -16,6 +16,8 @@ data/bot.lock
 data/sentiment.json
 data/cache/
 data/backtest_equity.csv
+data/backtest_history.jsonl
+data/backtest_runs/
 .pytest_cache/
 .superpowers/
 .gstack/
