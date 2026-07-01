@@ -191,8 +191,8 @@ def test_clamp_below_min_amount_returns_zero():
 
 
 def test_clamp_below_min_cost_returns_zero():
-    # 0.0001 BTC * 64000 = 6.4 < 10.0 min cost
-    assert market.clamp_to_market(_LimitsExchange(), "BTC/USDT", 0.0001, 64000.0) == 0.0
+    # qty 0.001 == min_amount (clears the amount gate); 0.001 * 9000 = $9 < $10 min cost -> 0
+    assert market.clamp_to_market(_LimitsExchange(), "BTC/USDT", 0.001, 9000.0) == 0.0
 
 
 def test_clamp_unknown_market_passes_through():
@@ -222,5 +222,5 @@ def test_clamp_zero_below_hl_min_amount():
 
 def test_clamp_zero_below_hl_min_cost():
     ex = HLMarketExchange()
-    # 0.0002 BTC * 60000 = $12 > $10 min cost, OK; 0.0001 * 60000 = $6 < $10 -> 0
-    assert market.clamp_to_market(ex, "BTC/USDC", 0.0001, 60000.0) == 0.0
+    # qty 0.001 == min_amount (clears the amount gate); 0.001 * 9000 = $9 < $10 min cost -> 0
+    assert market.clamp_to_market(ex, "BTC/USDC", 0.001, 9000.0) == 0.0
