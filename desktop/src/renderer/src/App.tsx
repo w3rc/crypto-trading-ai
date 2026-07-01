@@ -8,13 +8,14 @@ import TradesTable from "./components/TradesTable";
 import SentimentPanel from "./components/SentimentPanel";
 import BacktestChart from "./components/BacktestChart";
 import BacktestForm from "./components/BacktestForm";
+import BacktestHistory from "./components/BacktestHistory";
 import Settings from "./components/Settings";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar, { type View } from "./components/Sidebar";
 import PendingPanel from "./components/PendingPanel";
 import SymbolManager from "./components/SymbolManager";
 
-const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [], pending: {} };
+const EMPTY: Snapshot = { state: null, trades: [], decisions: [], sentiment: null, status: null, backtest: [], pending: {}, backtestHistory: [] };
 const api = (window as unknown as { api: { getSnapshot: () => Promise<Snapshot> } }).api;
 
 export default function App(): React.JSX.Element {
@@ -58,7 +59,9 @@ export default function App(): React.JSX.Element {
             <section className="card"><h2>Sentiment</h2><SentimentPanel sentiment={snap.sentiment} /></section>
           )}
           {view === "backtest" && (
-            <section className="card"><h2>Backtest</h2><BacktestForm status={snap.status} /><BacktestChart points={snap.backtest} /></section>
+            <section className="card"><h2>Backtest</h2><BacktestForm status={snap.status} /><BacktestChart points={snap.backtest} />
+              <div className="bt-history-wrap"><h2>Past runs</h2><BacktestHistory runs={snap.backtestHistory} /></div>
+            </section>
           )}
           {view === "settings" && (
             <section className="card"><h2>Settings</h2><Settings status={snap.status} /></section>

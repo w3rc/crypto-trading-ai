@@ -18,9 +18,14 @@ export type Status = { ts: string; strategy: string; exchange: string; mode?: st
                        auto_execute?: boolean;
                        interval_seconds?: number; symbols?: string[]; risk: RiskStatus; funding: FundingStatus };
 export type BacktestPoint = { ts: string; equity: number; buyHold: number };
+export type BacktestRun = { ts: string; symbols: string[]; strategy: string; timeframe: string;
+                            since: string; until: string | null; final_equity: number;
+                            total_return: number; buy_hold_return: number; beats_hold: boolean;
+                            max_drawdown: number; n_trades: number };
 export type Snapshot = { state: State | null; trades: Trade[]; decisions: Decision[];
                          sentiment: SentimentSnapshot | null;
-                         status: Status | null; backtest: BacktestPoint[]; pending: Pending };
+                         status: Status | null; backtest: BacktestPoint[]; pending: Pending;
+                         backtestHistory: BacktestRun[] };
 
 export function parseTradesCsv(text: string): Trade[] {
   const lines = text.trim().split("\n").filter((l) => l.trim() !== "");
@@ -40,6 +45,20 @@ export function parseDecisions(text: string): Decision[] {
       out.push(JSON.parse(t) as Decision);
     } catch {
       // skip a torn/partial line (e.g. process killed mid-append) — keep the rest
+    }
+  }
+  return out;
+}
+
+export function parseBacktestHistory(text: string): BacktestRun[] {
+  const out: BacktestRun[] = [];
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (t === "") continue;
+    try {
+      out.push(JSON.parse(t) as BacktestRun);
+    } catch {
+      // skip a torn/partial line — keep the rest
     }
   }
   return out;

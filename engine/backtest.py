@@ -1,4 +1,6 @@
 import argparse
+import json
+import os
 import time
 from datetime import datetime, timezone
 
@@ -141,6 +143,22 @@ def _write_equity(result, path):
         f.write("\n".join(lines) + "\n")
 
 
+def _append_history(result, symbols, strategy, timeframe, since, until, data_dir):
+    """Append this run's summary to <data_dir>/backtest_history.jsonl so past runs
+    (across symbols and strategies) can be compared in the dashboard."""
+    m = result["metrics"]
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "symbols": symbols, "strategy": strategy, "timeframe": timeframe,
+        "since": since, "until": until,
+        "final_equity": m["final_equity"], "total_return": m["total_return"],
+        "buy_hold_return": m["buy_hold_return"], "beats_hold": m["beats_hold"],
+        "max_drawdown": m["max_drawdown"], "n_trades": m["n_trades"],
+    }
+    with open(os.path.join(data_dir, "backtest_history.jsonl"), "a") as f:
+        f.write(json.dumps(entry) + "\n")
+
+
 def _print_summary(m, symbols, strategy, timeframe):
     verdict = "BEATS hold" if m["beats_hold"] else "loses to hold"
     print(
@@ -182,6 +200,7 @@ def main(argv=None):
                           args.strategy, cfg, exchange=exchange)
     _print_summary(result["metrics"], symbols, args.strategy, timeframe)
     _write_equity(result, args.out)
+    _append_history(result, symbols, args.strategy, timeframe, args.since, args.until, cfg.data_dir)
     return result
 
 

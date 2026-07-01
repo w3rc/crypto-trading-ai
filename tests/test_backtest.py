@@ -147,6 +147,21 @@ def test_preset_strategies_are_deterministic_no_warning():
     assert "hybrid" not in backtest.DETERMINISTIC   # hybrid is the only LLM strategy
 
 
+def test_append_history_is_append_only_with_the_run_summary(tmp_path):
+    import json as _json
+    result = {"metrics": {"final_equity": 11302.6, "total_return": 0.1303, "buy_hold_return": 0.2535,
+                          "beats_hold": False, "max_drawdown": -0.127, "n_trades": 242}}
+    backtest._append_history(result, ["BTC/USDT"], "macd_cross", "1d", "2021-07-01", None, str(tmp_path))
+    backtest._append_history(result, ["ETH/USDT"], "rsi_reversion", "1d", "2021-07-01", "2026-07-01", str(tmp_path))
+    lines = (tmp_path / "backtest_history.jsonl").read_text().strip().split("\n")
+    assert len(lines) == 2                                  # append-only, not overwritten
+    e = _json.loads(lines[0])
+    assert e["symbols"] == ["BTC/USDT"] and e["strategy"] == "macd_cross" and e["timeframe"] == "1d"
+    assert e["total_return"] == 0.1303 and e["beats_hold"] is False and e["n_trades"] == 242
+    assert e["until"] is None and "ts" in e
+    assert _json.loads(lines[1])["until"] == "2026-07-01"
+
+
 def test_auto_timeframe_coarsens_with_range():
     d = 86_400_000
     assert backtest._auto_timeframe(0, 5 * d) == "15m"        # ~1 week
