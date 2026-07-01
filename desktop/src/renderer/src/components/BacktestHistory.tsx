@@ -15,8 +15,9 @@ function ago(iso: string): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-export default function BacktestHistory({ runs, selectedId, onSelect }: {
+export default function BacktestHistory({ runs, selectedId, onSelect, onRerun, rerunningTs }: {
   runs: BacktestRun[]; selectedId?: string; onSelect: (r: BacktestRun) => void;
+  onRerun: (r: BacktestRun) => void; rerunningTs?: string | null;
 }): React.JSX.Element {
   if (!runs.length) return <div className="empty">No backtests yet — run one above to start comparing.</div>;
   const rows = [...runs].reverse();                              // most recent first
@@ -27,7 +28,7 @@ export default function BacktestHistory({ runs, selectedId, onSelect }: {
         <tr>
           <th>Ran</th><th>Symbols</th><th>Strategy</th><th>Range</th>
           <th className="num">Return</th><th className="num">vs Hold</th>
-          <th className="num">Trades</th><th className="num">Max DD</th>
+          <th className="num">Trades</th><th className="num">Max DD</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -44,6 +45,12 @@ export default function BacktestHistory({ runs, selectedId, onSelect }: {
             <td className="num" style={{ color: r.beats_hold ? "var(--up)" : "var(--down)" }}>{pct(r.total_return - r.buy_hold_return)}</td>
             <td className="num">{r.n_trades}</td>
             <td className="num muted">{pct(r.max_drawdown)}</td>
+            <td className="bt-rerun-cell">
+              <button className="bt-rerun" disabled={rerunningTs === r.ts}
+                      onClick={(e) => { e.stopPropagation(); onRerun(r); }}>
+                {rerunningTs === r.ts ? "Running…" : "Re-run"}
+              </button>
+            </td>
           </tr>
         ))}
       </tbody>

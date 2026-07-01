@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { join } from "path";
 import { is } from "@electron-toolkit/utils";
-import { readSnapshot, dataDir, readBacktestRun } from "../lib/snapshot";
+import { readSnapshot, dataDir, readBacktestRun, clearBacktestHistory } from "../lib/snapshot";
 import { writeControl, writeAutoExecute, writeStrategy } from "../lib/control";
 import { runBacktest, runBot, executeSuggestion } from "./engine";
 import { removePending } from "../lib/pending";
@@ -49,6 +49,7 @@ if (!app.requestSingleInstanceLock()) {
     ipcMain.handle("set-strategy", (_e, name: string) => writeStrategy(dataDir(), name));
     ipcMain.handle("run-backtest", (_e, opts) => runBacktest(opts));
     ipcMain.handle("get-backtest-run", (_e, id: string) => readBacktestRun(dataDir(), id));
+    ipcMain.handle("clear-backtest-history", () => clearBacktestHistory(dataDir()));
     ipcMain.handle("run-bot", () => runBot());
     ipcMain.handle("get-schedule", () => readSchedule(dataDir()));
     ipcMain.handle("set-schedule", async (_e, s) => {

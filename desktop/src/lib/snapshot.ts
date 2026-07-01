@@ -1,4 +1,4 @@
-import { readFile } from "fs/promises";
+import { readFile, rm } from "fs/promises";
 import { join, resolve } from "path";
 import { parseTradesCsv, parseDecisions, parseSentiment, parseBacktestCsv, parseBacktestHistory, parsePending, Snapshot, State, SentimentSnapshot, Status, BacktestPoint, BacktestRun, Pending } from "./parse";
 
@@ -30,4 +30,10 @@ export async function readSnapshot(dir: string): Promise<Snapshot> {
 export async function readBacktestRun(dir: string, id: string): Promise<BacktestPoint[]> {
   if (!/^[0-9T]+$/.test(id)) return [];   // guard: id is engine-generated; reject anything path-like
   return readOr<BacktestPoint[]>(join(dir, "backtest_runs", `${id}.csv`), [], parseBacktestCsv);
+}
+
+// Wipe the run log and all saved curves (the "Clear history" button).
+export async function clearBacktestHistory(dir: string): Promise<void> {
+  await rm(join(dir, "backtest_history.jsonl"), { force: true });
+  await rm(join(dir, "backtest_runs"), { recursive: true, force: true });
 }
