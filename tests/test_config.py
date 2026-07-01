@@ -355,3 +355,15 @@ def test_strategy_override_direct(tmp_path):
     (tmp_path / "control.json").write_text('{"strategy": "nope"}')
     assert _strategy_override(str(tmp_path), "hybrid") == "hybrid"           # not registered
     assert _strategy_override(str(tmp_path / "missing"), "hybrid") == "hybrid"  # no file
+
+
+def test_control_json_non_scalar_strategy_falls_back(tmp_path):
+    (tmp_path / "control.json").write_text('{"strategy": []}')   # non-scalar JSON value must not crash
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path))
+    assert load_config(str(p)).strategy == "hybrid"
+
+
+def test_control_json_non_scalar_mode_falls_back(tmp_path):
+    (tmp_path / "control.json").write_text('{"mode": []}')       # non-scalar JSON value must not crash
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "shadow"))
+    assert load_config(str(p)).mode == "shadow"

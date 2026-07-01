@@ -85,7 +85,7 @@ def _mode_override(data_dir: str, default: str) -> str:
             m = json.load(f).get("mode")
     except (OSError, json.JSONDecodeError, ValueError, AttributeError):
         return default                      # missing / unreadable / bad JSON / non-dict -> config mode
-    return m if m in _VALID_MODES else default
+    return m if isinstance(m, str) and m in _VALID_MODES else default
 
 
 def _auto_execute_override(data_dir: str, default: bool) -> bool:
@@ -107,7 +107,7 @@ def _strategy_override(data_dir: str, default: str) -> str:
             s = json.load(f).get("strategy")
     except (OSError, json.JSONDecodeError, ValueError, AttributeError):
         return default                      # missing / unreadable / bad JSON / non-dict
-    return s if s in strategies.STRATEGIES else default
+    return s if isinstance(s, str) and s in strategies.STRATEGIES else default
 
 
 _SYMBOL_RE = re.compile(r"^[A-Z0-9]+/[A-Z0-9]+$")
