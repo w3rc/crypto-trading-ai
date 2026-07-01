@@ -200,3 +200,27 @@ def test_clamp_unknown_market_passes_through():
         markets = {}
         def load_markets(self): return {}
     assert market.clamp_to_market(_Bare(), "BTC/USDT", 0.5, 100.0) == 0.5
+
+
+class HLMarketExchange:
+    id = "hyperliquid"
+    markets = {"BTC/USDC": {"limits": {"amount": {"min": 0.001}, "cost": {"min": 10.0}},
+                            "precision": {"amount": 0.0001}}}
+    def amount_to_precision(self, symbol, qty):
+        return f"{qty:.4f}"                     # 4-dp amount precision
+
+
+def test_clamp_rounds_to_hl_amount_precision():
+    ex = HLMarketExchange()
+    assert market.clamp_to_market(ex, "BTC/USDC", 0.123456, 60000.0) == 0.1235
+
+
+def test_clamp_zero_below_hl_min_amount():
+    ex = HLMarketExchange()
+    assert market.clamp_to_market(ex, "BTC/USDC", 0.0005, 60000.0) == 0.0   # below min amount 0.001
+
+
+def test_clamp_zero_below_hl_min_cost():
+    ex = HLMarketExchange()
+    # 0.0002 BTC * 60000 = $12 > $10 min cost, OK; 0.0001 * 60000 = $6 < $10 -> 0
+    assert market.clamp_to_market(ex, "BTC/USDC", 0.0001, 60000.0) == 0.0
