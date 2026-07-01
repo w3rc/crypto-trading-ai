@@ -1,9 +1,11 @@
 import os
-from engine.config import load_config, _auto_execute_override
+from engine.config import load_config, _auto_execute_override, _strategy_override
 
-def test_load_config_defaults(monkeypatch):
+def test_load_config_defaults(monkeypatch, tmp_path):
     monkeypatch.setenv("MYHERMES_API_KEY", "test-key-123")
-    cfg = load_config("engine/config.yaml")
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "engine", "config.yaml")
+    monkeypatch.chdir(tmp_path)   # hermetic: real data/ overrides (symbols.json/control.json) don't leak in
+    cfg = load_config(cfg_path)
     assert cfg.exchange == "binance"
     assert cfg.symbols == ["BTC/USDT", "ETH/USDT"]
     assert cfg.paper_capital == 10000.0
@@ -18,9 +20,11 @@ def test_load_config_missing_key_is_empty_not_error(monkeypatch):
     cfg = load_config("engine/config.yaml")
     assert cfg.llm.api_key == ""   # absent key -> "" (tests/mocks don't need it)
 
-def test_strategy_and_rules_load(monkeypatch):
+def test_strategy_and_rules_load(monkeypatch, tmp_path):
     monkeypatch.setenv("MYHERMES_API_KEY", "test-key-123")
-    cfg = load_config("engine/config.yaml")
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "engine", "config.yaml")
+    monkeypatch.chdir(tmp_path)   # hermetic: control.json strategy override doesn't leak in
+    cfg = load_config(cfg_path)
     assert cfg.strategy == "hybrid"
     assert cfg.rules.rsi_buy == 30
     assert cfg.rules.rsi_sell == 70
@@ -332,3 +336,22 @@ def test_auto_execute_override_non_bool_falls_back(tmp_path):
     assert _auto_execute_override(str(tmp_path), False) is False
     (tmp_path / "control.json").write_text("not json")
     assert _auto_execute_override(str(tmp_path), True) is True
+
+
+def test_control_json_overrides_strategy(tmp_path):
+    (tmp_path / "control.json").write_text('{"strategy": "ma_cross"}')
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path))
+    assert load_config(str(p)).strategy == "ma_cross"     # control.json wins
+
+def test_control_json_invalid_strategy_ignored(tmp_path):
+    (tmp_path / "control.json").write_text('{"strategy": "bogus"}')
+    p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path))
+    assert load_config(str(p)).strategy == "hybrid"       # unregistered -> config default
+
+def test_strategy_override_direct(tmp_path):
+    from engine.config import _strategy_override
+    (tmp_path / "control.json").write_text('{"strategy": "bollinger"}')
+    assert _strategy_override(str(tmp_path), "hybrid") == "bollinger"
+    (tmp_path / "control.json").write_text('{"strategy": "nope"}')
+    assert _strategy_override(str(tmp_path), "hybrid") == "hybrid"           # not registered
+    assert _strategy_override(str(tmp_path / "missing"), "hybrid") == "hybrid"  # no file
