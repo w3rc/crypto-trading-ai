@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from engine.indicators import compute_indicators
+from engine.indicators import compute_indicators, compute_indicators_series
 
 def _df(closes):
     return pd.DataFrame({
@@ -27,6 +27,15 @@ def test_falling_series_is_oversold():
 def test_too_few_rows_raises():
     with pytest.raises(ValueError):
         compute_indicators(_df([100.0 + i for i in range(10)]))
+
+def test_series_last_row_matches_scalar_and_warms_up():
+    df = _df([100.0 + i for i in range(60)])
+    series = compute_indicators_series(df)
+    scalar = compute_indicators(df)
+    assert len(series) == len(df)                       # one row per candle
+    for k, v in scalar.items():
+        assert series.iloc[-1][k] == pytest.approx(v)   # last row == the scalar (live) result
+    assert pd.isna(series.iloc[0]["ma_slow"])           # warmup rows carry NaN (rolling(50) not yet valid)
 
 def test_bollinger_bands_ordered_and_centered():
     f = compute_indicators(_df([100.0 + i for i in range(60)]))

@@ -16,12 +16,13 @@ test("buildBacktestArgs with since and until", () => {
   ]);
 });
 
-test("buildBacktestArgs threads --strategy when set", () => {
-  expect(buildBacktestArgs({ since: "2026-01-01", until: "2026-03-01", strategy: "ma_cross" })).toEqual([
+test("buildBacktestArgs threads --strategy and --symbols when set", () => {
+  expect(buildBacktestArgs({ since: "2026-01-01", until: "2026-03-01", strategy: "ma_cross", symbols: "BTC/USDT,ETH/USDT" })).toEqual([
     "-m", "engine.backtest",
     "--since", "2026-01-01",
     "--until", "2026-03-01",
     "--strategy", "ma_cross",
+    "--symbols", "BTC/USDT,ETH/USDT",
     "--out", "data/backtest_equity.csv",
   ]);
 });
