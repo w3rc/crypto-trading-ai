@@ -1,6 +1,5 @@
 """Read-only exchange connection check: build the exchange from config and fetch the
 real balance. Backs the dashboard's Settings "Test connection" button. Places no orders."""
-import logging
 import sys
 
 from engine import market
@@ -23,7 +22,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     from engine.env import load_dotenv
     load_dotenv()
     sys.exit(main())

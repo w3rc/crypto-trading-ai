@@ -45,8 +45,8 @@ export default function ExchangeSettings(): React.JSX.Element {
   const save = async (): Promise<void> => {
     const creds: Record<string, string> = {};
     for (const f of FIELDS[exchange]) {
-      const val = inputs[f.key];
-      if (val && val.length > 0) creds[f.key] = val;   // blank keeps the stored value
+      const val = (inputs[f.key] ?? "").trim();
+      if (val) creds[f.key] = val;   // blank/whitespace-only keeps the stored value (no accidental overwrite)
     }
     try {
       const v = await api.setExchangeConfig({ activeExchange: exchange, testnet, [exchange]: creds });
