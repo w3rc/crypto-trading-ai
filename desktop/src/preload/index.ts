@@ -18,6 +18,7 @@ const api = {
   openExternal: (url: string) => ipcRenderer.invoke("open-external", url),
   getExchangeConfig: () => ipcRenderer.invoke("get-exchange-config"),
   setExchangeConfig: (update: unknown) => ipcRenderer.invoke("set-exchange-config", update),
+  testExchangeConnection: () => ipcRenderer.invoke("test-exchange-connection"),
 };
 
 if (process.contextIsolated) {

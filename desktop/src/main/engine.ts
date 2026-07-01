@@ -54,6 +54,10 @@ export function runSentiment(): Promise<RunResult> {
   return spawnEngine(["-m", "engine.analyze_sentiment"]);   // sentiment-only; no trading, pinned
 }
 
+export function testConnection(): Promise<RunResult> {
+  return spawnEngine(["-m", "engine.test_connection"]);   // read-only balance check; pinned, no arming
+}
+
 export function executeSuggestion(symbol: string): Promise<RunResult> {
   return spawnEngineArmed(["-m", "engine.execute", symbol]);
 }

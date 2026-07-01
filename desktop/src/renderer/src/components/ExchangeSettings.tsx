@@ -11,6 +11,7 @@ type ExchangeConfigView = {
 const api = (window as unknown as { api: {
   getExchangeConfig: () => Promise<ExchangeConfigView>;
   setExchangeConfig: (u: unknown) => Promise<ExchangeConfigView>;
+  testExchangeConnection: () => Promise<{ ok: boolean; code: number | null; stderrTail: string }>;
 } }).api;
 
 const FIELDS: Record<ExchangeId, { key: string; label: string }[]> = {
@@ -30,6 +31,7 @@ export default function ExchangeSettings(): React.JSX.Element {
   const [testnet, setTestnet] = useState(true);
   const [inputs, setInputs] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState("");
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     api.getExchangeConfig().then((v) => {
@@ -52,6 +54,15 @@ export default function ExchangeSettings(): React.JSX.Element {
     } catch (err) {
       setMsg(`Could not save: ${String(err)}`);
     }
+  };
+
+  const test = async (): Promise<void> => {
+    if (testing) return;
+    setTesting(true); setMsg("");
+    try {
+      const r = await api.testExchangeConnection();
+      setMsg(r.ok ? "Connection ok." : `Connection failed${r.stderrTail ? `: ${r.stderrTail}` : ""}.`);
+    } catch { setMsg("Connection failed."); } finally { setTesting(false); }
   };
 
   return (
@@ -96,6 +107,7 @@ export default function ExchangeSettings(): React.JSX.Element {
 
       <div className="settings-actions">
         <button className="bt-run" onClick={save}>Save exchange</button>
+        <button className="bt-run" disabled={testing} onClick={test}>{testing ? "Testing…" : "Test connection"}</button>
       </div>
       <div className="settings-summary">Credentials are encrypted on this device and never leave it in plain text. Leave a field blank to keep the saved value.</div>
       {msg && <div className="bt-result">{msg}</div>}

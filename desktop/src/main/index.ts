@@ -3,7 +3,7 @@ import { join } from "path";
 import { is } from "@electron-toolkit/utils";
 import { readSnapshot, dataDir, readBacktestRun, clearBacktestHistory } from "../lib/snapshot";
 import { writeControl, writeAutoExecute, writeStrategy } from "../lib/control";
-import { runBacktest, runBot, runSentiment, executeSuggestion } from "./engine";
+import { runBacktest, runBot, runSentiment, executeSuggestion, testConnection } from "./engine";
 import { getExchangeConfig, setExchangeConfig } from "./secrets";
 import { removePending } from "../lib/pending";
 import { applySchedule } from "./scheduler";
@@ -58,6 +58,7 @@ if (!is.dev && !app.requestSingleInstanceLock()) {
     ipcMain.handle("clear-backtest-history", () => clearBacktestHistory(dataDir()));
     ipcMain.handle("run-bot", () => runBot());
     ipcMain.handle("run-sentiment", () => runSentiment());
+    ipcMain.handle("test-exchange-connection", () => testConnection());
     ipcMain.handle("get-schedule", () => readSchedule(dataDir()));
     ipcMain.handle("set-schedule", async (_e, s) => {
       const saved = await writeSchedule(dataDir(), s);
