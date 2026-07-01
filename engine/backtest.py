@@ -97,7 +97,8 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
             "buy_hold_curve": buy_hold_curve, "trades": trades, "timeline": timeline}
 
 
-DETERMINISTIC = {"indicator_rule", "sentiment_rule"}
+# Every strategy except "hybrid" is rule-based (no LLM); only hybrid triggers the cost warning.
+DETERMINISTIC = {"indicator_rule", "sentiment_rule", "ma_cross", "macd_cross", "rsi_reversion", "bollinger"}
 
 
 def _to_ms(date_str):

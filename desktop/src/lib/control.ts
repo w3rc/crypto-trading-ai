@@ -1,11 +1,9 @@
 import { writeFile, mkdir, readFile } from "fs/promises";
 import { join } from "path";
+import { STRATEGY_IDS } from "./strategies";
 
 const VALID = new Set(["paper", "shadow", "live"]);
-const VALID_STRATEGIES = new Set([
-  "hybrid", "indicator_rule", "sentiment_rule",
-  "ma_cross", "macd_cross", "rsi_reversion", "bollinger",
-]);
+const VALID_STRATEGIES = new Set(STRATEGY_IDS);
 
 async function _merge(dir: string, patch: Record<string, unknown>): Promise<void> {
   await mkdir(dir, { recursive: true });

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Status } from "../../../lib/parse";
 import { freshness } from "../../../lib/status";
+import { STRATEGIES } from "../../../lib/strategies";
 
 export type View = "overview" | "positions" | "pairs" | "activity" | "sentiment" | "backtest" | "settings";
 
@@ -18,16 +19,6 @@ const MODES: { id: string; label: string }[] = [
   { id: "paper", label: "Paper" },
   { id: "shadow", label: "Shadow" },
   { id: "live", label: "Live" },
-];
-
-const STRATEGIES: { id: string; label: string }[] = [
-  { id: "hybrid", label: "AI (hybrid)" },
-  { id: "indicator_rule", label: "Indicator rule" },
-  { id: "sentiment_rule", label: "Sentiment rule" },
-  { id: "ma_cross", label: "MA cross" },
-  { id: "macd_cross", label: "MACD cross" },
-  { id: "rsi_reversion", label: "RSI reversion" },
-  { id: "bollinger", label: "Bollinger" },
 ];
 
 // 16px line icons (stroke = currentColor, so they inherit the nav link's color/active accent)
