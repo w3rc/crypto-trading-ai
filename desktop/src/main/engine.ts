@@ -1,15 +1,14 @@
 import { spawn } from "child_process";
 import { existsSync } from "fs";
-import { join, resolve } from "path";
+import { resolve } from "path";
 import { dataDir } from "../lib/snapshot";
 import { buildBacktestArgs, isIsoDate, BacktestOpts } from "../lib/backtest";
-import { pinnedEnv } from "../lib/spawn";
+import { pinnedEnv, resolvePython, depHint } from "../lib/spawn";
 
 export type RunResult = { ok: boolean; code: number | null; stderrTail: string };
 
 function pythonPath(repoRoot: string): string {
-  const venv = join(repoRoot, ".venv", "bin", "python");
-  return existsSync(venv) ? venv : "python3";
+  return resolvePython(repoRoot, process.platform, existsSync);
 }
 
 // ponytail: dev-local repoRoot/venv resolution; packaged-app python bundling (deferred C1) is out of scope.
@@ -20,7 +19,7 @@ function runEngine(args: string[], env: NodeJS.ProcessEnv): Promise<RunResult> {
     let stderr = "";
     child.stderr.on("data", (d) => { stderr = (stderr + d.toString()).slice(-2048); });
     child.on("error", (e) => resolveP({ ok: false, code: null, stderrTail: e.message }));
-    child.on("close", (code) => resolveP({ ok: code === 0, code, stderrTail: stderr.trim() }));
+    child.on("close", (code) => resolveP({ ok: code === 0, code, stderrTail: depHint(stderr.trim()) }));
   });
 }
 
