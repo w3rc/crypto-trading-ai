@@ -126,6 +126,14 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .symbol-x { background: none; border: none; color: var(--muted); font: inherit; font-size: 15px;
   line-height: 1; cursor: pointer; padding: 0 4px; }
 .symbol-x:disabled { opacity: 0.35; cursor: not-allowed; }
+.pair-rows { display: flex; flex-direction: column; gap: 8px; }
+.pair-row { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 8px; }
+.pair-sym { font-weight: 600; }
+.pair-links { display: flex; align-items: center; gap: 6px; }
+.pair-link { background: none; border: 1px solid var(--glass-border); color: var(--muted);
+  font: inherit; font-size: 12px; padding: 4px 8px; border-radius: 6px; cursor: pointer; }
+.pair-link:hover { color: var(--text); border-color: var(--accent); }
 .symbol-input { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 8px;
   color: var(--text); font: inherit; padding: 7px 10px; width: 150px; }
 .error-fallback .muted { color: var(--muted); margin: 4px 0 0; }

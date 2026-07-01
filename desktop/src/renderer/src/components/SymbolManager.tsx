@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import type { Status, State } from "../../../lib/parse";
 import { validSymbol } from "../../../lib/symbols";
+import { pairLinks } from "../../../lib/links";
 
 const api = (window as unknown as {
-  api: { setSymbols: (list: string[]) => Promise<string[]> };
+  api: {
+    setSymbols: (list: string[]) => Promise<string[]>;
+    openExternal: (url: string) => Promise<void>;
+  };
 }).api;
 
 export default function SymbolManager({ status, state }: { status: Status | null; state: State | null }): React.JSX.Element {
@@ -41,14 +45,20 @@ export default function SymbolManager({ status, state }: { status: Status | null
 
   return (
     <div className="settings-form">
-      <div className="symbol-chips">
+      <div className="pair-rows">
         {symbols.map((s) => (
-          <span className="symbol-chip" key={s}>
-            {s}
-            <button className="symbol-x" disabled={hasPosition(s)}
-                    title={hasPosition(s) ? "close the position first" : "remove"}
-                    onClick={() => removeSymbol(s)}>×</button>
-          </span>
+          <div className="pair-row" key={s}>
+            <span className="pair-sym">{s}</span>
+            <div className="pair-links">
+              {pairLinks(s).map((l) => (
+                <button className="pair-link" key={l.label}
+                        onClick={() => api.openExternal(l.url)}>{l.label}</button>
+              ))}
+              <button className="symbol-x" disabled={hasPosition(s)}
+                      title={hasPosition(s) ? "close the position first" : "remove"}
+                      onClick={() => removeSymbol(s)}>×</button>
+            </div>
+          </div>
         ))}
       </div>
       <div className="settings-actions">
