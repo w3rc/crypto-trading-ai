@@ -140,6 +140,13 @@ def test_sentiment_rule_is_deterministic_no_warning():
     assert "sentiment_rule" in backtest.DETERMINISTIC
 
 
+def test_preset_strategies_are_deterministic_no_warning():
+    # the rule-based presets never call the LLM -> must not trigger the cost warning
+    for name in ("ma_cross", "macd_cross", "rsi_reversion", "bollinger"):
+        assert name in backtest.DETERMINISTIC
+    assert "hybrid" not in backtest.DETERMINISTIC   # hybrid is the only LLM strategy
+
+
 def test_main_warns_on_non_deterministic_strategy(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(backtest, "run_backtest", lambda *a, **k: {
         "metrics": {"final_equity": 0, "total_return": 0, "buy_hold_return": 0,

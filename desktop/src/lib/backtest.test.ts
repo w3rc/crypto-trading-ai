@@ -16,6 +16,16 @@ test("buildBacktestArgs with since and until", () => {
   ]);
 });
 
+test("buildBacktestArgs threads --strategy when set", () => {
+  expect(buildBacktestArgs({ since: "2026-01-01", until: "2026-03-01", strategy: "ma_cross" })).toEqual([
+    "-m", "engine.backtest",
+    "--since", "2026-01-01",
+    "--until", "2026-03-01",
+    "--strategy", "ma_cross",
+    "--out", "data/backtest_equity.csv",
+  ]);
+});
+
 test("isIsoDate validates YYYY-MM-DD", () => {
   expect(isIsoDate("2026-01-01")).toBe(true);
   expect(isIsoDate("2026-1-1")).toBe(false);

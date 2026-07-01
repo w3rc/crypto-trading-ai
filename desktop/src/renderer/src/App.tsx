@@ -58,7 +58,7 @@ export default function App(): React.JSX.Element {
             <section className="card"><h2>Sentiment</h2><SentimentPanel sentiment={snap.sentiment} /></section>
           )}
           {view === "backtest" && (
-            <section className="card"><h2>Backtest</h2><BacktestForm /><BacktestChart points={snap.backtest} /></section>
+            <section className="card"><h2>Backtest</h2><BacktestForm status={snap.status} /><BacktestChart points={snap.backtest} /></section>
           )}
           {view === "settings" && (
             <section className="card"><h2>Settings</h2><Settings status={snap.status} /></section>
