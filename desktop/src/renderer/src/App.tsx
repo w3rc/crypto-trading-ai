@@ -38,7 +38,7 @@ export default function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <Sidebar status={snap.status} view={view} onNavigate={setView} decisions={snap.decisions} />
+      <Sidebar status={snap.status} view={view} onNavigate={setView} />
       <main className="main">
         <ErrorBoundary key={view}>
           {view === "overview" && <Overview snap={snap} />}
