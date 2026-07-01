@@ -314,21 +314,63 @@ with:
         strategy=_strategy_override(raw["data_dir"], raw.get("strategy", "hybrid")),
 ```
 
-- [ ] **Step 4: Run to verify they pass**
+- [ ] **Step 4: Make two pre-existing non-hermetic config tests hermetic**
+
+`test_load_config_defaults` and `test_strategy_and_rules_load` load the real `engine/config.yaml` against the real `data/` dir, so working-tree runtime overrides (`data/symbols.json`, and — once this feature ships — `data/control.json`'s `strategy`) leak in and break their assertions. This already fails on `main` when `data/symbols.json` exists. Apply the file's existing hermetic pattern (see `test_mode_defaults_paper`): run under an empty tmp cwd.
+
+Replace:
+
+```python
+def test_load_config_defaults(monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "test-key-123")
+    cfg = load_config("engine/config.yaml")
+```
+
+with:
+
+```python
+def test_load_config_defaults(monkeypatch, tmp_path):
+    monkeypatch.setenv("MYHERMES_API_KEY", "test-key-123")
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "engine", "config.yaml")
+    monkeypatch.chdir(tmp_path)   # hermetic: real data/ overrides (symbols.json/control.json) don't leak in
+    cfg = load_config(cfg_path)
+```
+
+Replace:
+
+```python
+def test_strategy_and_rules_load(monkeypatch):
+    monkeypatch.setenv("MYHERMES_API_KEY", "test-key-123")
+    cfg = load_config("engine/config.yaml")
+```
+
+with:
+
+```python
+def test_strategy_and_rules_load(monkeypatch, tmp_path):
+    monkeypatch.setenv("MYHERMES_API_KEY", "test-key-123")
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "engine", "config.yaml")
+    monkeypatch.chdir(tmp_path)   # hermetic: control.json strategy override doesn't leak in
+    cfg = load_config(cfg_path)
+```
+
+(`os` is already imported at the top of `tests/test_config.py`.)
+
+- [ ] **Step 5: Run config tests**
 
 Run: `python -m pytest tests/test_config.py -v`
-Expected: PASS (all config tests).
+Expected: PASS — new strategy-override tests plus the now-hermetic defaults tests.
 
-- [ ] **Step 5: Full Python suite green**
+- [ ] **Step 6: Full Python suite green**
 
 Run: `python -m pytest -q`
-Expected: PASS (no regressions from the new import / indicator keys).
+Expected: `0 failed` — the pre-existing `test_load_config_defaults` failure (working-tree `data/symbols.json` override) is resolved by the Step 4 hermeticity fix.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add engine/config.py tests/test_config.py
-git commit -m "feat(engine): control.json strategy override (fail-safe to config)"
+git commit -m "feat(engine): control.json strategy override + hermetic config default tests"
 ```
 
 ---
