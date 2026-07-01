@@ -66,7 +66,7 @@ export default function BacktestForm({ status }: { status: Status | null }): Rea
           AI (hybrid) runs an LLM call per candle — a multi-year backtest is slow and costly. Use a short range, or pick a rule-based strategy.
         </div>
       )}
-      {result && result.ok && <div className="bt-result">Backtest complete — chart updating…</div>}
+      {result && result.ok && <div className="bt-result">Backtest complete — results below.</div>}
       {result && !result.ok && (
         <div className="bt-result bt-error">Backtest failed<pre>{result.stderrTail || "(no output)"}</pre></div>
       )}
