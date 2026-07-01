@@ -34,7 +34,7 @@ class _LiveMarket:
     def __init__(self, cash=5000.0, qty=None, price=159.0):
         self.cash, self.qty, self.price = cash, qty or {}, price
         self.orders = []
-    def make_exchange(self, name, mode="paper", api_key="", secret=""): return object()
+    def make_exchange(self, name, mode="paper", api_key="", secret="", **kw): return object()
     def fetch_ohlcv_df(self, ex, sym, tf, limit=200): return _df()
     def fetch_price(self, ex, sym): return self.price
     def fetch_balance(self, ex, symbols): return self.cash, {s: self.qty.get(s, 0.0) for s in symbols}

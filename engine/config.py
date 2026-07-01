@@ -72,6 +72,9 @@ class Config:
     auto_execute: bool = False
     exchange_api_key: str = field(default="", repr=False)
     exchange_secret: str = field(default="", repr=False)
+    exchange_wallet: str = field(default="", repr=False)
+    exchange_private_key: str = field(default="", repr=False)
+    testnet: bool = False
 
 
 _VALID_MODES = {"paper", "shadow", "live"}
@@ -86,6 +89,12 @@ def _mode_override(data_dir: str, default: str) -> str:
     except (OSError, json.JSONDecodeError, ValueError, AttributeError):
         return default                      # missing / unreadable / bad JSON / non-dict -> config mode
     return m if isinstance(m, str) and m in _VALID_MODES else default
+
+
+def _testnet_flag(default: bool) -> bool:
+    """EXCHANGE_TESTNET in env wins ('1' -> True, anything else -> False); absent -> config default."""
+    v = os.environ.get("EXCHANGE_TESTNET")
+    return v == "1" if v is not None else default
 
 
 def _auto_execute_override(data_dir: str, default: bool) -> bool:
@@ -187,4 +196,7 @@ def load_config(path: str = "engine/config.yaml") -> Config:
         interval_seconds=int(raw.get("interval_seconds", 900)),
         exchange_api_key=os.environ.get(raw.get("exchange_api_key_env", "EXCHANGE_API_KEY"), ""),
         exchange_secret=os.environ.get(raw.get("exchange_secret_env", "EXCHANGE_API_SECRET"), ""),
+        exchange_wallet=os.environ.get(raw.get("exchange_wallet_env", "HYPERLIQUID_WALLET_ADDRESS"), ""),
+        exchange_private_key=os.environ.get(raw.get("exchange_private_key_env", "HYPERLIQUID_PRIVATE_KEY"), ""),
+        testnet=_testnet_flag(bool(raw.get("testnet", False))),
     )

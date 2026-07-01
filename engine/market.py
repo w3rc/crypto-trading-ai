@@ -17,12 +17,20 @@ def supports_short(exchange) -> bool:
     return options.get("defaultType", "spot") in _DERIVATIVE_TYPES
 
 
-def make_exchange(name: str, mode: str = "paper", api_key: str = "", secret: str = ""):
+def make_exchange(name: str, mode: str = "paper", api_key: str = "", secret: str = "",
+                  *, wallet: str = "", private_key: str = "", testnet: bool = False):
     opts = {"enableRateLimit": True}
     if mode in ("shadow", "live"):
-        opts["apiKey"] = api_key
-        opts["secret"] = secret
-    return getattr(ccxt, name)(opts)
+        if name == "hyperliquid":                 # DEX: wallet address + agent-wallet private key
+            opts["walletAddress"] = wallet
+            opts["privateKey"] = private_key
+        else:                                      # CEX: api key + secret
+            opts["apiKey"] = api_key
+            opts["secret"] = secret
+    ex = getattr(ccxt, name)(opts)
+    if testnet:                                    # public + private URLs -> the exchange's testnet
+        ex.set_sandbox_mode(True)
+    return ex
 
 
 def fetch_ohlcv_df(exchange, symbol: str, timeframe: str, limit: int = 200) -> pd.DataFrame:
@@ -42,8 +50,8 @@ def fetch_balance(exchange, symbols: list[str]) -> tuple[float, dict[str, float]
     def free(asset: str) -> float:
         return float((bal.get(asset) or {}).get("free", 0.0) or 0.0)
 
-    quote = symbols[0].split("/")[1] if symbols else "USDT"
-    # ponytail: assumes one shared quote across symbols (USDT); multi-quote is a later refinement.
+    quote = symbols[0].split("/")[1] if symbols else "USDC"
+    # ponytail: assumes one shared quote across symbols (symbols[0]'s quote); multi-quote is a later refinement.
     cash = free(quote)
     qty = {s: free(s.split("/")[0]) for s in symbols}
     return cash, qty
