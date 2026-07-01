@@ -25,3 +25,9 @@ export async function readSnapshot(dir: string): Promise<Snapshot> {
   const backtestHistory = await readOr<BacktestRun[]>(join(dir, "backtest_history.jsonl"), [], parseBacktestHistory);
   return { state, trades, decisions, sentiment, status, backtest, pending, backtestHistory };
 }
+
+// Load one past run's equity curve on demand (clicking a row in the history table).
+export async function readBacktestRun(dir: string, id: string): Promise<BacktestPoint[]> {
+  if (!/^[0-9T]+$/.test(id)) return [];   // guard: id is engine-generated; reject anything path-like
+  return readOr<BacktestPoint[]>(join(dir, "backtest_runs", `${id}.csv`), [], parseBacktestCsv);
+}

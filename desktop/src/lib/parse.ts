@@ -18,7 +18,7 @@ export type Status = { ts: string; strategy: string; exchange: string; mode?: st
                        auto_execute?: boolean;
                        interval_seconds?: number; symbols?: string[]; risk: RiskStatus; funding: FundingStatus };
 export type BacktestPoint = { ts: string; equity: number; buyHold: number };
-export type BacktestRun = { ts: string; symbols: string[]; strategy: string; timeframe: string;
+export type BacktestRun = { id?: string; ts: string; symbols: string[]; strategy: string; timeframe: string;
                             since: string; until: string | null; final_equity: number;
                             total_return: number; buy_hold_return: number; beats_hold: boolean;
                             max_drawdown: number; n_trades: number };
