@@ -51,7 +51,7 @@ export default function App(): React.JSX.Element {
             </div>
           )}
           {view === "pairs" && (
-            <section className="card"><h2>Trading pairs</h2><SymbolManager status={snap.status} state={snap.state} /></section>
+            <section className="card"><SymbolManager status={snap.status} state={snap.state} /></section>
           )}
           {view === "activity" && <Activity snap={snap} />}
           {view === "sentiment" && (
