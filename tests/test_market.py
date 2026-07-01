@@ -91,7 +91,7 @@ def test_make_exchange_live_loads_credentials():
 class _FilledExchange:
     def __init__(self):
         self.calls = []
-    def create_order(self, symbol, order_type, side, amount):
+    def create_order(self, symbol, order_type, side, amount, price=None, params=None):
         self.calls.append((symbol, order_type, side, amount))
         return {"id": "1", "status": "closed", "filled": amount,
                 "average": 64010.0, "fee": {"cost": 0.64, "currency": "USDT"}}
@@ -110,7 +110,7 @@ class _AsyncExchange:
     """Returns 'open' with no fill detail, then a closed order on fetch_order."""
     def __init__(self):
         self.fetch_calls = []
-    def create_order(self, symbol, order_type, side, amount):
+    def create_order(self, symbol, order_type, side, amount, price=None, params=None):
         return {"id": "9", "status": "open", "filled": 0.0}
     def fetch_order(self, oid, symbol):
         self.fetch_calls.append((oid, symbol))
@@ -125,7 +125,7 @@ def test_create_order_repolls_when_not_filled():
 
 
 class _ErrorRepollExchange:
-    def create_order(self, symbol, order_type, side, amount):
+    def create_order(self, symbol, order_type, side, amount, price=None, params=None):
         return {"id": "7", "status": "open", "filled": 0.0}
     def fetch_order(self, oid, symbol):
         raise RuntimeError("429 rate limit")
@@ -140,13 +140,40 @@ def test_create_order_repoll_failure_falls_back(caplog):
 
 
 class _NoAvgExchange:
-    def create_order(self, symbol, order_type, side, amount):
+    def create_order(self, symbol, order_type, side, amount, price=None, params=None):
         return {"id": "2", "status": "closed", "filled": amount}   # no average, no fee
 
 
 def test_create_order_falls_back_to_ref_price_and_zero_fee():
     fill = market.create_order(_NoAvgExchange(), "BTC/USDT", "sell", 0.01, 63000.0, "T")
     assert fill.price == 63000.0 and fill.fee == 0.0   # ref_price fallback, fee defaults 0
+
+
+class RecordingExchange:
+    id = "binance"
+    def __init__(self, exid="binance"):
+        self.id = exid
+        self.calls = []
+    def create_order(self, symbol, otype, side, qty, price=None, params=None):
+        self.calls.append({"symbol": symbol, "type": otype, "side": side,
+                           "qty": qty, "price": price, "params": params})
+        return {"status": "closed", "filled": qty, "average": price or 100.0,
+                "fee": {"cost": 0.0}, "id": "1"}
+
+
+def test_create_order_hyperliquid_passes_reference_price():
+    ex = RecordingExchange("hyperliquid")
+    fill = market.create_order(ex, "BTC/USDC", "buy", 0.5, 60000.0, "2026-07-01T00:00:00Z")
+    assert ex.calls[0]["type"] == "market"
+    assert ex.calls[0]["price"] == 60000.0     # HL needs the ref price to build its aggressive limit
+    assert fill.qty == 0.5
+
+
+def test_create_order_binance_sends_plain_market_no_price():
+    ex = RecordingExchange("binance")
+    market.create_order(ex, "BTC/USDT", "sell", 0.5, 60000.0, "2026-07-01T00:00:00Z")
+    assert ex.calls[0]["type"] == "market"
+    assert ex.calls[0]["price"] is None        # a true-market venue gets no price
 
 
 class _LimitsExchange:
