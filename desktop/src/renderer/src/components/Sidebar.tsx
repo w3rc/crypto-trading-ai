@@ -15,11 +15,20 @@ const NAV: { id: View; label: string }[] = [
   { id: "settings", label: "Settings" },
 ];
 
+// Offered modes. Shadow is intentionally not offered — Paper (simulated + P&L) supersedes it,
+// and shadow lives on only as the unarmed-live runtime fallback. See modesFor().
 const MODES: { id: string; label: string }[] = [
   { id: "paper", label: "Paper" },
-  { id: "shadow", label: "Shadow" },
   { id: "live", label: "Live" },
 ];
+
+// If the bot is already in an unlisted mode (e.g. legacy "shadow"), keep it visible as an
+// active, de-selectable segment so the user isn't stranded with nothing highlighted; it
+// vanishes once they switch to an offered mode (choose() no-ops on the already-active one).
+function modesFor(active: string): { id: string; label: string }[] {
+  if (MODES.some((m) => m.id === active)) return MODES;
+  return [...MODES, { id: active, label: active.charAt(0).toUpperCase() + active.slice(1) }];
+}
 
 // 16px line icons (stroke = currentColor, so they inherit the nav link's color/active accent)
 const ICONS: Record<View, React.JSX.Element> = {
@@ -116,7 +125,7 @@ export default function Sidebar({ status, view, onNavigate }: {
         <div className="rail-toggle">
           <div className="rail-toggle-label">Mode</div>
           <div className="seg">
-            {MODES.map((m) => (
+            {modesFor(activeMode).map((m) => (
               <button
                 key={m.id}
                 className={`seg-btn ${activeMode === m.id ? "active" : ""}`}

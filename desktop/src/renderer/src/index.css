@@ -3,7 +3,12 @@
   --glass: rgba(255,255,255,0.05); --glass-border: rgba(255,255,255,0.10);
   --text: #e8edf7; --muted: #93a0bd; --up: #34d399; --down: #f87171; --accent: #7c8bff;
 }
-* { box-sizing: border-box; }
+* { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: var(--glass-border) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
 html, body, #root { margin: 0; padding: 0; min-height: 100vh; }
 body {
   background: radial-gradient(1200px 600px at 80% -10%, #1d2748 0%, transparent 60%),
