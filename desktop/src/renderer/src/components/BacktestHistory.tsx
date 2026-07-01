@@ -15,7 +15,9 @@ function ago(iso: string): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
-export default function BacktestHistory({ runs }: { runs: BacktestRun[] }): React.JSX.Element {
+export default function BacktestHistory({ runs, selectedId, onSelect }: {
+  runs: BacktestRun[]; selectedId?: string; onSelect: (r: BacktestRun) => void;
+}): React.JSX.Element {
   if (!runs.length) return <div className="empty">No backtests yet — run one above to start comparing.</div>;
   const rows = [...runs].reverse();                              // most recent first
   const best = Math.max(...runs.map((r) => r.total_return));     // most profitable run
@@ -30,12 +32,15 @@ export default function BacktestHistory({ runs }: { runs: BacktestRun[] }): Reac
       </thead>
       <tbody>
         {rows.map((r, i) => (
-          <tr key={i} className={r.total_return === best ? "best" : ""}>
+          <tr key={r.id ?? i} className={r.id && r.id === selectedId ? "selected" : ""}
+              onClick={() => onSelect(r)}>
             <td className="muted">{ago(r.ts)}</td>
             <td>{r.symbols.join(", ")}</td>
             <td>{LABEL[r.strategy] ?? r.strategy}</td>
             <td className="muted">{r.since} → {r.until ?? "now"} · {r.timeframe}</td>
-            <td className="num" style={{ color: r.total_return >= 0 ? "var(--up)" : "var(--down)" }}>{pct(r.total_return)}</td>
+            <td className="num" style={{ color: r.total_return >= 0 ? "var(--up)" : "var(--down)" }}>
+              {r.total_return === best && <span className="best-star" title="best return">★ </span>}{pct(r.total_return)}
+            </td>
             <td className="num" style={{ color: r.beats_hold ? "var(--up)" : "var(--down)" }}>{pct(r.total_return - r.buy_hold_return)}</td>
             <td className="num">{r.n_trades}</td>
             <td className="num muted">{pct(r.max_drawdown)}</td>

@@ -35,8 +35,11 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .bt-history .num { text-align: right; }
 .bt-history th.num { text-align: right; }
 .bt-history .muted { color: var(--muted); }
-.bt-history tr.best td { background: rgba(124,139,255,0.10); }
-.bt-history tr.best td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.bt-history tbody tr { cursor: pointer; }
+.bt-history tbody tr:hover td { background: rgba(255,255,255,0.035); }
+.bt-history tr.selected td { background: rgba(124,139,255,0.14); }
+.bt-history tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.best-star { color: var(--accent); }
 .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .badge.buy { background: rgba(52,211,153,0.15); color: var(--up); }
 .badge.sell { background: rgba(248,113,113,0.15); color: var(--down); }

@@ -6,9 +6,7 @@ import PositionsTable from "./components/PositionsTable";
 import DecisionLog from "./components/DecisionLog";
 import TradesTable from "./components/TradesTable";
 import SentimentPanel from "./components/SentimentPanel";
-import BacktestChart from "./components/BacktestChart";
-import BacktestForm from "./components/BacktestForm";
-import BacktestHistory from "./components/BacktestHistory";
+import BacktestPanel from "./components/BacktestPanel";
 import Settings from "./components/Settings";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Sidebar, { type View } from "./components/Sidebar";
@@ -59,8 +57,8 @@ export default function App(): React.JSX.Element {
             <section className="card"><h2>Sentiment</h2><SentimentPanel sentiment={snap.sentiment} /></section>
           )}
           {view === "backtest" && (
-            <section className="card"><h2>Backtest</h2><BacktestForm status={snap.status} /><BacktestChart points={snap.backtest} />
-              <div className="bt-history-wrap"><h2>Past runs</h2><BacktestHistory runs={snap.backtestHistory} /></div>
+            <section className="card"><h2>Backtest</h2>
+              <BacktestPanel status={snap.status} latest={snap.backtest} history={snap.backtestHistory} />
             </section>
           )}
           {view === "settings" && (

@@ -144,11 +144,17 @@ def _write_equity(result, path):
 
 
 def _append_history(result, symbols, strategy, timeframe, since, until, data_dir):
-    """Append this run's summary to <data_dir>/backtest_history.jsonl so past runs
-    (across symbols and strategies) can be compared in the dashboard."""
+    """Append this run's summary to <data_dir>/backtest_history.jsonl, and save its
+    equity curve to <data_dir>/backtest_runs/<id>.csv so a past run can be re-selected
+    and shown in the chart (compared across symbols and strategies)."""
+    now = datetime.now(timezone.utc)
+    run_id = now.strftime("%Y%m%dT%H%M%S%f")   # unique to the microsecond, filesystem-safe
+    runs_dir = os.path.join(data_dir, "backtest_runs")
+    os.makedirs(runs_dir, exist_ok=True)
+    _write_equity(result, os.path.join(runs_dir, f"{run_id}.csv"))   # per-run curve, loaded on click
     m = result["metrics"]
     entry = {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "id": run_id, "ts": now.isoformat(),
         "symbols": symbols, "strategy": strategy, "timeframe": timeframe,
         "since": since, "until": until,
         "final_equity": m["final_equity"], "total_return": m["total_return"],

@@ -147,10 +147,11 @@ def test_preset_strategies_are_deterministic_no_warning():
     assert "hybrid" not in backtest.DETERMINISTIC   # hybrid is the only LLM strategy
 
 
-def test_append_history_is_append_only_with_the_run_summary(tmp_path):
+def test_append_history_writes_summary_and_per_run_curve(tmp_path):
     import json as _json
     result = {"metrics": {"final_equity": 11302.6, "total_return": 0.1303, "buy_hold_return": 0.2535,
-                          "beats_hold": False, "max_drawdown": -0.127, "n_trades": 242}}
+                          "beats_hold": False, "max_drawdown": -0.127, "n_trades": 242},
+              "equity_curve": [10000.0, 10500.0], "buy_hold_curve": [10000.0, 10300.0], "timeline": [1000, 2000]}
     backtest._append_history(result, ["BTC/USDT"], "macd_cross", "1d", "2021-07-01", None, str(tmp_path))
     backtest._append_history(result, ["ETH/USDT"], "rsi_reversion", "1d", "2021-07-01", "2026-07-01", str(tmp_path))
     lines = (tmp_path / "backtest_history.jsonl").read_text().strip().split("\n")
@@ -158,7 +159,8 @@ def test_append_history_is_append_only_with_the_run_summary(tmp_path):
     e = _json.loads(lines[0])
     assert e["symbols"] == ["BTC/USDT"] and e["strategy"] == "macd_cross" and e["timeframe"] == "1d"
     assert e["total_return"] == 0.1303 and e["beats_hold"] is False and e["n_trades"] == 242
-    assert e["until"] is None and "ts" in e
+    assert e["until"] is None and "ts" in e and "id" in e
+    assert (tmp_path / "backtest_runs" / f"{e['id']}.csv").exists()   # per-run curve saved
     assert _json.loads(lines[1])["until"] == "2026-07-01"
 
 
