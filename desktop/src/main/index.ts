@@ -4,6 +4,7 @@ import { is } from "@electron-toolkit/utils";
 import { readSnapshot, dataDir, readBacktestRun, clearBacktestHistory } from "../lib/snapshot";
 import { writeControl, writeAutoExecute, writeStrategy } from "../lib/control";
 import { runBacktest, runBot, runSentiment, executeSuggestion } from "./engine";
+import { getExchangeConfig, setExchangeConfig } from "./secrets";
 import { removePending } from "../lib/pending";
 import { applySchedule } from "./scheduler";
 import { readSchedule, writeSchedule } from "../lib/scheduler";
@@ -64,6 +65,8 @@ if (!is.dev && !app.requestSingleInstanceLock()) {
       return saved;
     });
     ipcMain.handle("set-symbols", (_e, list) => writeSymbols(dataDir(), list));
+    ipcMain.handle("get-exchange-config", () => getExchangeConfig());
+    ipcMain.handle("set-exchange-config", (_e, update) => setExchangeConfig(update));
     ipcMain.handle("execute-suggestion", (_e, sym: string) => executeSuggestion(sym));
     ipcMain.handle("dismiss-suggestion", (_e, sym: string) => removePending(dataDir(), sym));
     ipcMain.handle("set-auto-execute", (_e, on: boolean) => writeAutoExecute(dataDir(), on));
