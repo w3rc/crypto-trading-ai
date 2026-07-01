@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Status } from "../../../lib/parse";
+import ExchangeSettings from "./ExchangeSettings";
 
 type Schedule = { enabled: boolean; intervalSeconds: number };
 type Result = { ok: boolean; stderrTail: string } | null;
@@ -81,6 +82,7 @@ export default function Settings({ status }: { status: Status | null }): React.J
 
   return (
     <div className="settings">
+      <ExchangeSettings />
       <section className="settings-group">
         <div className="settings-group-title">Execution</div>
         <Toggle checked={autoExec} onChange={toggleAuto} name="Auto-execute trades"
