@@ -19,7 +19,20 @@ const MODES: { id: string; label: string }[] = [
   { id: "live", label: "Live" },
 ];
 
-const api = (window as unknown as { api: { setMode?: (m: string) => Promise<void> } }).api;
+const STRATEGIES: { id: string; label: string }[] = [
+  { id: "hybrid", label: "AI (hybrid)" },
+  { id: "indicator_rule", label: "Indicator rule" },
+  { id: "sentiment_rule", label: "Sentiment rule" },
+  { id: "ma_cross", label: "MA cross" },
+  { id: "macd_cross", label: "MACD cross" },
+  { id: "rsi_reversion", label: "RSI reversion" },
+  { id: "bollinger", label: "Bollinger" },
+];
+
+const api = (window as unknown as { api: {
+  setMode?: (m: string) => Promise<void>;
+  setStrategy?: (s: string) => Promise<void>;
+} }).api;
 
 export default function Sidebar({ status, view, onNavigate, decisions }: {
   status: Status | null;
@@ -46,6 +59,19 @@ export default function Sidebar({ status, view, onNavigate, decisions }: {
     }
     setPending(m);
     void api?.setMode?.(m).catch(() => setPending(null));        // failed write -> drop optimistic state
+  };
+
+  const currentStrat = status?.strategy ?? "hybrid";
+  const [pendingStrat, setPendingStrat] = useState<string | null>(null);
+  useEffect(() => {
+    if (pendingStrat && status?.strategy === pendingStrat) setPendingStrat(null);  // bot caught up
+  }, [status?.strategy, pendingStrat]);
+  const activeStrat = pendingStrat ?? currentStrat;
+
+  const chooseStrat = (s: string): void => {
+    if (s === activeStrat) return;
+    setPendingStrat(s);
+    void api?.setStrategy?.(s).catch(() => setPendingStrat(null));   // failed write -> drop optimistic
   };
 
   return (
@@ -94,6 +120,17 @@ export default function Sidebar({ status, view, onNavigate, decisions }: {
           ))}
         </div>
         {pending && pending !== current && <div className="rail-toggle-hint">applies next cycle</div>}
+      </div>
+
+      <div className="rail-toggle">
+        <div className="rail-toggle-label">Strategy</div>
+        <select className="rail-select" value={activeStrat}
+                onChange={(e) => chooseStrat(e.target.value)}>
+          {STRATEGIES.map((s) => (
+            <option key={s.id} value={s.id}>{s.label}</option>
+          ))}
+        </select>
+        {pendingStrat && pendingStrat !== currentStrat && <div className="rail-toggle-hint">applies next cycle</div>}
       </div>
 
       <div className="rail-foot">
