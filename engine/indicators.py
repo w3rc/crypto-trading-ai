@@ -36,6 +36,8 @@ def compute_indicators(df: pd.DataFrame) -> dict:
     ema_slow = close.ewm(span=26, adjust=False).mean()
     macd = ema_fast - ema_slow
     signal = macd.ewm(span=9, adjust=False).mean()
+    bb_mid = close.rolling(20).mean().iloc[-1]
+    bb_std = close.rolling(20).std().iloc[-1]     # ddof=1 (pandas default)
     return {
         "price": float(close.iloc[-1]),
         "rsi": float(_rsi(close).iloc[-1]),
@@ -44,4 +46,7 @@ def compute_indicators(df: pd.DataFrame) -> dict:
         "ma_fast": float(close.rolling(20).mean().iloc[-1]),
         "ma_slow": float(close.rolling(50).mean().iloc[-1]),
         "atr": float(_atr(df).iloc[-1]),
+        "bb_mid": float(bb_mid),
+        "bb_upper": float(bb_mid + 2 * bb_std),
+        "bb_lower": float(bb_mid - 2 * bb_std),
     }

@@ -27,3 +27,12 @@ def test_falling_series_is_oversold():
 def test_too_few_rows_raises():
     with pytest.raises(ValueError):
         compute_indicators(_df([100.0 + i for i in range(10)]))
+
+def test_bollinger_bands_ordered_and_centered():
+    f = compute_indicators(_df([100.0 + i for i in range(60)]))
+    assert f["bb_upper"] > f["bb_mid"] > f["bb_lower"]
+    assert f["bb_mid"] == pytest.approx(149.5)     # mean of last 20 closes (140..159)
+
+def test_bollinger_flat_series_has_zero_width():
+    f = compute_indicators(_df([100.0] * 60))
+    assert f["bb_upper"] == f["bb_mid"] == f["bb_lower"] == 100.0
