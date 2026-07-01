@@ -64,7 +64,10 @@ def create_order(exchange, symbol: str, side: str, qty: float, ref_price: float,
     filled/average/fee; re-polls once via fetch_order if not yet filled;
     falls back to ref_price for a missing average and 0.0 for a missing fee.
     """
-    o = exchange.create_order(symbol, "market", side, qty)
+    # Hyperliquid has no native market order — ccxt builds an aggressive limit and needs a
+    # reference price; a true-market venue (Binance) takes a plain market order with no price.
+    price_arg = ref_price if getattr(exchange, "id", "") == "hyperliquid" else None
+    o = exchange.create_order(symbol, "market", side, qty, price_arg)
     filled = float(o.get("filled") or 0.0)
     if o.get("status") != "closed" or filled <= 0:
         # ponytail: single re-poll, no chase loop; an under-read remainder
