@@ -4,6 +4,7 @@ import { resolve } from "path";
 import { dataDir } from "../lib/snapshot";
 import { buildBacktestArgs, isIsoDate, BacktestOpts } from "../lib/backtest";
 import { pinnedEnv, resolvePython, depHint } from "../lib/spawn";
+import { exchangeEnv } from "./secrets";
 
 export type RunResult = { ok: boolean; code: number | null; stderrTail: string };
 
@@ -15,7 +16,9 @@ function pythonPath(repoRoot: string): string {
 function runEngine(args: string[], env: NodeJS.ProcessEnv): Promise<RunResult> {
   const repoRoot = resolve(dataDir(), "..");
   return new Promise((resolveP) => {
-    const child = spawn(pythonPath(repoRoot), args, { cwd: repoRoot, env });
+    // Active-exchange credentials layer UNDER the caller's env, so pinnedEnv's
+    // LIVE_TRADING_ARMED="no" (and any explicit override) still wins.
+    const child = spawn(pythonPath(repoRoot), args, { cwd: repoRoot, env: { ...exchangeEnv(), ...env } });
     let stderr = "";
     child.stderr.on("data", (d) => { stderr = (stderr + d.toString()).slice(-2048); });
     child.on("error", (e) => resolveP({ ok: false, code: null, stderrTail: e.message }));
