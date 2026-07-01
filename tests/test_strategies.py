@@ -184,6 +184,26 @@ def test_bollinger_inside_holds():
     d = strategies.bollinger(_feats_bb(price=100, lower=95, upper=105), _FLAT, 1000.0, _ns())
     assert d.action == "hold"
 
+
+def test_bollinger_at_lower_buys():   # price == lower (inclusive boundary)
+    d = strategies.bollinger(_feats_bb(price=95, lower=95, upper=105), _FLAT, 1000.0, _ns(buy_size=0.6))
+    assert d.action == "buy"
+
+
+def test_bollinger_at_upper_sells():   # price == upper (inclusive boundary)
+    d = strategies.bollinger(_feats_bb(price=105, lower=95, upper=105), _FLAT, 1000.0, _ns())
+    assert d.action == "sell"
+
+
+def test_rsi_reversion_at_buy_threshold_holds():   # rsi == rsi_buy -> hold (strict <)
+    d = strategies.rsi_reversion(_feats(rsi=30), _FLAT, 1000.0, _ns())
+    assert d.action == "hold"
+
+
+def test_rsi_reversion_at_sell_threshold_holds():   # rsi == rsi_sell -> hold (strict >)
+    d = strategies.rsi_reversion(_feats(rsi=70), _FLAT, 1000.0, _ns())
+    assert d.action == "hold"
+
 def test_new_presets_registered():
     for name in ("ma_cross", "macd_cross", "rsi_reversion", "bollinger"):
         assert strategies.get(name) is getattr(strategies, name)
