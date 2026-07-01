@@ -6,6 +6,8 @@ from typing import Optional
 
 import yaml
 
+from engine import strategies
+
 
 @dataclass
 class RiskConfig:
@@ -83,7 +85,7 @@ def _mode_override(data_dir: str, default: str) -> str:
             m = json.load(f).get("mode")
     except (OSError, json.JSONDecodeError, ValueError, AttributeError):
         return default                      # missing / unreadable / bad JSON / non-dict -> config mode
-    return m if m in _VALID_MODES else default
+    return m if isinstance(m, str) and m in _VALID_MODES else default
 
 
 def _auto_execute_override(data_dir: str, default: bool) -> bool:
@@ -95,6 +97,17 @@ def _auto_execute_override(data_dir: str, default: bool) -> bool:
     except (OSError, json.JSONDecodeError, ValueError, AttributeError):
         return default                      # missing / unreadable / bad JSON / non-dict
     return v if isinstance(v, bool) else default
+
+
+def _strategy_override(data_dir: str, default: str) -> str:
+    """A registered strategy name in <data_dir>/control.json overrides config; fail-safe to default."""
+    path = os.path.join(data_dir, "control.json")
+    try:
+        with open(path) as f:
+            s = json.load(f).get("strategy")
+    except (OSError, json.JSONDecodeError, ValueError, AttributeError):
+        return default                      # missing / unreadable / bad JSON / non-dict
+    return s if isinstance(s, str) and s in strategies.STRATEGIES else default
 
 
 _SYMBOL_RE = re.compile(r"^[A-Z0-9]+/[A-Z0-9]+$")
@@ -153,7 +166,7 @@ def load_config(path: str = "engine/config.yaml") -> Config:
             model=llm["model"],
             json_mode=bool(llm.get("json_mode", True)),
         ),
-        strategy=raw.get("strategy", "hybrid"),
+        strategy=_strategy_override(raw["data_dir"], raw.get("strategy", "hybrid")),
         rules=RulesConfig(
             rsi_buy=float(rules_raw.get("rsi_buy", 30)),
             rsi_sell=float(rules_raw.get("rsi_sell", 70)),

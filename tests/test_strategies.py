@@ -128,3 +128,82 @@ def test_sentiment_rule_missing_key_treated_as_neutral():
 
 def test_sentiment_rule_registered():
     assert strategies.get("sentiment_rule") is strategies.sentiment_rule
+
+
+def _feats_bb(price, lower, upper):
+    return {"price": price, "bb_lower": lower, "bb_upper": upper,
+            "rsi": 50, "macd": 0.0, "macd_signal": 0.0,
+            "ma_fast": 100.0, "ma_slow": 100.0, "atr": 1.0}
+
+
+def test_ma_cross_golden_buys():
+    d = strategies.ma_cross(_feats(rsi=50, fast=101, slow=100), _FLAT, 1000.0, _ns(buy_size=0.4))
+    assert d.action == "buy" and d.size == 0.4
+
+def test_ma_cross_death_sells():
+    d = strategies.ma_cross(_feats(rsi=50, fast=99, slow=100), _FLAT, 1000.0, _ns())
+    assert d.action == "sell" and d.size == 1.0
+
+def test_ma_cross_equal_holds():
+    d = strategies.ma_cross(_feats(rsi=50, fast=100, slow=100), _FLAT, 1000.0, _ns())
+    assert d.action == "hold"
+
+def test_macd_cross_bull_buys():
+    d = strategies.macd_cross(_feats(rsi=50, macd=1, sig=0), _FLAT, 1000.0, _ns(buy_size=0.5))
+    assert d.action == "buy" and d.size == 0.5
+
+def test_macd_cross_bear_sells():
+    d = strategies.macd_cross(_feats(rsi=50, macd=-1, sig=0), _FLAT, 1000.0, _ns())
+    assert d.action == "sell" and d.size == 1.0
+
+def test_macd_cross_equal_holds():
+    d = strategies.macd_cross(_feats(rsi=50, macd=0, sig=0), _FLAT, 1000.0, _ns())
+    assert d.action == "hold"
+
+def test_rsi_reversion_oversold_buys():
+    d = strategies.rsi_reversion(_feats(rsi=25), _FLAT, 1000.0, _ns(buy_size=0.3))
+    assert d.action == "buy" and d.size == 0.3
+
+def test_rsi_reversion_overbought_sells():
+    d = strategies.rsi_reversion(_feats(rsi=80), _FLAT, 1000.0, _ns())
+    assert d.action == "sell" and d.size == 1.0
+
+def test_rsi_reversion_neutral_holds():
+    d = strategies.rsi_reversion(_feats(rsi=50), _FLAT, 1000.0, _ns())
+    assert d.action == "hold"
+
+def test_bollinger_below_lower_buys():
+    d = strategies.bollinger(_feats_bb(price=90, lower=95, upper=105), _FLAT, 1000.0, _ns(buy_size=0.6))
+    assert d.action == "buy" and d.size == 0.6
+
+def test_bollinger_above_upper_sells():
+    d = strategies.bollinger(_feats_bb(price=110, lower=95, upper=105), _FLAT, 1000.0, _ns())
+    assert d.action == "sell" and d.size == 1.0
+
+def test_bollinger_inside_holds():
+    d = strategies.bollinger(_feats_bb(price=100, lower=95, upper=105), _FLAT, 1000.0, _ns())
+    assert d.action == "hold"
+
+
+def test_bollinger_at_lower_buys():   # price == lower (inclusive boundary)
+    d = strategies.bollinger(_feats_bb(price=95, lower=95, upper=105), _FLAT, 1000.0, _ns(buy_size=0.6))
+    assert d.action == "buy"
+
+
+def test_bollinger_at_upper_sells():   # price == upper (inclusive boundary)
+    d = strategies.bollinger(_feats_bb(price=105, lower=95, upper=105), _FLAT, 1000.0, _ns())
+    assert d.action == "sell"
+
+
+def test_rsi_reversion_at_buy_threshold_holds():   # rsi == rsi_buy -> hold (strict <)
+    d = strategies.rsi_reversion(_feats(rsi=30), _FLAT, 1000.0, _ns())
+    assert d.action == "hold"
+
+
+def test_rsi_reversion_at_sell_threshold_holds():   # rsi == rsi_sell -> hold (strict >)
+    d = strategies.rsi_reversion(_feats(rsi=70), _FLAT, 1000.0, _ns())
+    assert d.action == "hold"
+
+def test_new_presets_registered():
+    for name in ("ma_cross", "macd_cross", "rsi_reversion", "bollinger"):
+        assert strategies.get(name) is getattr(strategies, name)

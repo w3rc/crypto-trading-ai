@@ -11,6 +11,7 @@ const api = {
   executeSuggestion: (symbol: string) => ipcRenderer.invoke("execute-suggestion", symbol),
   dismissSuggestion: (symbol: string) => ipcRenderer.invoke("dismiss-suggestion", symbol),
   setAutoExecute: (on: boolean) => ipcRenderer.invoke("set-auto-execute", on),
+  setStrategy: (name: string) => ipcRenderer.invoke("set-strategy", name),
 };
 
 if (process.contextIsolated) {
