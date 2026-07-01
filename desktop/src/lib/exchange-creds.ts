@@ -23,12 +23,12 @@ export interface ExchangeConfigUpdate {
   hyperliquid?: { walletAddress?: string; privateKey?: string };
 }
 
-export const DEFAULT_CREDS: ExchangeCreds = {
+export const DEFAULT_CREDS: ExchangeCreds = Object.freeze({
   activeExchange: "hyperliquid",
   testnet: true,
-  binance: { apiKey: "", secret: "" },
-  hyperliquid: { walletAddress: "", privateKey: "" },
-};
+  binance: Object.freeze({ apiKey: "", secret: "" }),
+  hyperliquid: Object.freeze({ walletAddress: "", privateKey: "" }),
+}) as ExchangeCreds;
 
 export function redact(c: ExchangeCreds): ExchangeConfigView {
   return {
