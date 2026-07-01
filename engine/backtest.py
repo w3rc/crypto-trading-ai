@@ -41,6 +41,19 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
     if cfg.risk.allow_short is None and exchange is not None:
         cfg.risk.allow_short = market.supports_short(exchange)
 
+    # precompute the causal indicator series once per symbol (O(n)) and index it by ts,
+    # instead of recomputing the whole trailing window every step (O(n^2)).
+    series, first_ready = {}, {}
+    for sym in symbols:
+        d = data[sym]
+        s = indicators.compute_indicators_series(d)
+        s.index = d["ts"].to_numpy()
+        series[sym] = s
+        first_ready[sym] = (d["ts"].iloc[indicators.MIN_ROWS - 1]
+                            if len(d) >= indicators.MIN_ROWS else None)
+    ready_from = (None if any(v is None for v in first_ready.values())
+                  else max(first_ready.values()))
+
     cash = cfg.paper_capital
     positions = {sym: Position(sym) for sym in symbols}
     equity_curve = [cfg.paper_capital]
@@ -49,12 +62,9 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
     last_funding_ms = None
 
     for ts in timeline:
-        windows = {sym: data[sym][data[sym]["ts"] <= ts] for sym in symbols}
-        if any(len(w) < indicators.MIN_ROWS for w in windows.values()):
-            continue  # warmup: skip until every symbol has enough rows
-        # ponytail: recomputes indicators over the whole trailing window each step
-        # (O(n^2) total); precompute rolling indicators if backtests get slow.
-        feats = {sym: indicators.compute_indicators(windows[sym]) for sym in symbols}
+        if ready_from is None or ts < ready_from:
+            continue  # warmup: skip until every symbol has >= MIN_ROWS rows
+        feats = {sym: {k: float(v) for k, v in series[sym].loc[ts].items()} for sym in symbols}
         prices = {sym: feats[sym]["price"] for sym in symbols}
         sent = (sentiment.aggregate_sentiment(symbols, cfg, backtest=True, ts_ms=ts)
                 if cfg.sentiment.enabled else {})
@@ -100,6 +110,19 @@ def run_backtest(symbols, timeframe, since_ms, until_ms, strategy_name, cfg,
 # Every strategy except "hybrid" is rule-based (no LLM); only hybrid triggers the cost warning.
 DETERMINISTIC = {"indicator_rule", "sentiment_rule", "ma_cross", "macd_cross", "rsi_reversion", "bollinger"}
 
+# Cap backtest bars by auto-picking a coarser timeframe on long ranges — a 5-year range at
+# 15m is ~175k candles/symbol (huge fetch + compute), but only ~1825 at 1d.
+_TF_LADDER = [("15m", 900_000), ("1h", 3_600_000), ("4h", 14_400_000), ("1d", 86_400_000)]
+
+
+def _auto_timeframe(since_ms, until_ms, max_bars=3000):
+    """Finest timeframe whose bar count over the range stays <= max_bars."""
+    span = max(0, until_ms - since_ms)
+    for tf, ms in _TF_LADDER:
+        if span <= max_bars * ms:
+            return tf
+    return _TF_LADDER[-1][0]
+
 
 def _to_ms(date_str):
     dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -134,7 +157,7 @@ def main(argv=None):
     cfg = load_config()
     p = argparse.ArgumentParser(prog="engine.backtest")
     p.add_argument("--symbols", default=",".join(cfg.symbols))
-    p.add_argument("--timeframe", default=cfg.timeframe)
+    p.add_argument("--timeframe", default=None)   # None -> auto-pick by range
     p.add_argument("--since", required=True)
     p.add_argument("--until", default=None)
     p.add_argument("--strategy", default=cfg.strategy)
@@ -145,8 +168,9 @@ def main(argv=None):
     symbols = [s.strip() for s in args.symbols.split(",") if s.strip()]
     since_ms = _to_ms(args.since)
     until_ms = _to_ms(args.until) if args.until else int(time.time() * 1000)
+    timeframe = args.timeframe or _auto_timeframe(since_ms, until_ms)   # coarser candles on long ranges
     cfg.symbols, cfg.timeframe, cfg.strategy, cfg.paper_capital = (
-        symbols, args.timeframe, args.strategy, args.capital)
+        symbols, timeframe, args.strategy, args.capital)
 
     if args.strategy not in DETERMINISTIC:
         print(f"WARNING: strategy '{args.strategy}' is not deterministic — it makes "
@@ -154,9 +178,9 @@ def main(argv=None):
               f"this can be slow and costly. The cheap path is 'indicator_rule'.")
 
     exchange = market.make_exchange(cfg.exchange)
-    result = run_backtest(symbols, args.timeframe, since_ms, until_ms,
+    result = run_backtest(symbols, timeframe, since_ms, until_ms,
                           args.strategy, cfg, exchange=exchange)
-    _print_summary(result["metrics"], symbols, args.strategy, args.timeframe)
+    _print_summary(result["metrics"], symbols, args.strategy, timeframe)
     _write_equity(result, args.out)
     return result
 

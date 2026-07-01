@@ -35,7 +35,7 @@ def test_strategy_and_rules_default_when_absent(tmp_path, monkeypatch):
     p = tmp_path / "c.yaml"
     p.write_text(
         "exchange: binance\nsymbols: [BTC/USDT]\ntimeframe: 15m\n"
-        "paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: data\n"
+        f"paper_capital: 1000\nfee_pct: 0.001\nslippage_pct: 0.0005\ndata_dir: {tmp_path}\n"   # hermetic: no stray control.json override
         "risk:\n  max_position_pct: 0.25\n  stop_loss_pct: 0.05\n"
         "llm:\n  base_url: x\n  api_key_env: MYHERMES_API_KEY\n  model: m\n  json_mode: true\n"
     )

@@ -147,6 +147,15 @@ def test_preset_strategies_are_deterministic_no_warning():
     assert "hybrid" not in backtest.DETERMINISTIC   # hybrid is the only LLM strategy
 
 
+def test_auto_timeframe_coarsens_with_range():
+    d = 86_400_000
+    assert backtest._auto_timeframe(0, 5 * d) == "15m"        # ~1 week
+    assert backtest._auto_timeframe(0, 30 * d) == "15m"       # 1 month (2880 bars)
+    assert backtest._auto_timeframe(0, 90 * d) == "1h"        # 3 months
+    assert backtest._auto_timeframe(0, 365 * d) == "4h"       # 1 year
+    assert backtest._auto_timeframe(0, 5 * 365 * d) == "1d"   # 5 years -> ~1825 bars, not ~175k
+
+
 def test_main_warns_on_non_deterministic_strategy(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(backtest, "run_backtest", lambda *a, **k: {
         "metrics": {"final_equity": 0, "total_return": 0, "buy_hold_return": 0,
