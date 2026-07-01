@@ -1,5 +1,5 @@
-exchange: binance
-symbols: [BTC/USDT, ETH/USDT]
+exchange: hyperliquid
+symbols: [BTC/USDC, ETH/USDC]     # Hyperliquid quotes USDC, not USDT
 timeframe: 15m
 paper_capital: 10000.0
 fee_pct: 0.001
@@ -8,8 +8,11 @@ data_dir: data
 mode: paper                       # paper (simulated) | shadow (real read-only) | live (real orders)
 auto_execute: false   # OFF = bot proposes; you Execute/Dismiss each trade. Dashboard toggles this.
 # Live also requires env LIVE_TRADING_ARMED=yes (second switch); touch data/HALT to stop instantly.
-# exchange_api_key_env: EXCHANGE_API_KEY      # env var holding a READ-ONLY exchange key (shadow)
-# exchange_secret_env: EXCHANGE_API_SECRET
+# Credentials come from env (the desktop Settings panel injects them; or set them in .env):
+#   Hyperliquid: HYPERLIQUID_WALLET_ADDRESS / HYPERLIQUID_PRIVATE_KEY  (use an AGENT wallet — trade-only, no withdrawals)
+#   Binance:     EXCHANGE_API_KEY / EXCHANGE_API_SECRET
+#   EXCHANGE_TESTNET=1 routes shadow/live to the exchange testnet. Override the env-var NAMES with
+#   exchange_wallet_env / exchange_private_key_env / exchange_api_key_env / exchange_secret_env if needed.
 interval_seconds: 900  # seconds between cron cycles; the dashboard flags STALE past ~2.5x this
 risk:
   max_position_pct: 0.25

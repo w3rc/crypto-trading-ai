@@ -6,8 +6,8 @@ def test_load_config_defaults(monkeypatch, tmp_path):
     cfg_path = os.path.join(os.path.dirname(__file__), "..", "engine", "config.yaml")
     monkeypatch.chdir(tmp_path)   # hermetic: real data/ overrides (symbols.json/control.json) don't leak in
     cfg = load_config(cfg_path)
-    assert cfg.exchange == "binance"
-    assert cfg.symbols == ["BTC/USDT", "ETH/USDT"]
+    assert cfg.exchange == "hyperliquid"
+    assert cfg.symbols == ["BTC/USDC", "ETH/USDC"]
     assert cfg.paper_capital == 10000.0
     assert cfg.risk.max_position_pct == 0.25
     assert cfg.llm.model == "z-ai/glm-5.2"
