@@ -165,6 +165,8 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; }
 .field-label { font-size: 12px; color: var(--muted); }
 .field-row input { width: 120px; background: var(--glass); border: 1px solid var(--glass-border);
   border-radius: 8px; color: var(--text); font: inherit; padding: 7px 10px; }
+.cred-input { font-family: ui-monospace, monospace; letter-spacing: 1px; }
+.cred-note { border-left: 2px solid var(--accent); padding-left: 10px; }
 .symbol-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .symbol-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--glass);
   border: 1px solid var(--glass-border); border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 13px; }
