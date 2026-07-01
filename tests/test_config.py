@@ -367,3 +367,40 @@ def test_control_json_non_scalar_mode_falls_back(tmp_path):
     (tmp_path / "control.json").write_text('{"mode": []}')       # non-scalar JSON value must not crash
     p = tmp_path / "c.yaml"; p.write_text(_toggle_yaml(tmp_path, "shadow"))
     assert load_config(str(p)).mode == "shadow"
+
+
+def test_load_config_exchange_credentials_and_testnet(monkeypatch, tmp_path):
+    monkeypatch.setenv("MYHERMES_API_KEY", "test-key-123")
+    monkeypatch.setenv("HYPERLIQUID_WALLET_ADDRESS", "0xabc")
+    monkeypatch.setenv("HYPERLIQUID_PRIVATE_KEY", "0xpk")
+    monkeypatch.setenv("EXCHANGE_API_KEY", "bkey")
+    monkeypatch.setenv("EXCHANGE_API_SECRET", "bsec")
+    monkeypatch.setenv("EXCHANGE_TESTNET", "1")
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "engine", "config.yaml")
+    monkeypatch.chdir(tmp_path)
+    cfg = load_config(cfg_path)
+    assert cfg.exchange_wallet == "0xabc"
+    assert cfg.exchange_private_key == "0xpk"
+    assert cfg.exchange_api_key == "bkey"
+    assert cfg.exchange_secret == "bsec"
+    assert cfg.testnet is True
+
+
+def test_testnet_defaults_false_and_creds_empty_without_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    for v in ("EXCHANGE_TESTNET", "HYPERLIQUID_WALLET_ADDRESS", "HYPERLIQUID_PRIVATE_KEY"):
+        monkeypatch.delenv(v, raising=False)
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "engine", "config.yaml")
+    monkeypatch.chdir(tmp_path)
+    cfg = load_config(cfg_path)
+    assert cfg.testnet is False
+    assert cfg.exchange_wallet == ""
+    assert cfg.exchange_private_key == ""
+
+
+def test_exchange_testnet_zero_is_false(monkeypatch, tmp_path):
+    monkeypatch.setenv("MYHERMES_API_KEY", "k")
+    monkeypatch.setenv("EXCHANGE_TESTNET", "0")
+    cfg_path = os.path.join(os.path.dirname(__file__), "..", "engine", "config.yaml")
+    monkeypatch.chdir(tmp_path)
+    assert load_config(cfg_path).testnet is False
